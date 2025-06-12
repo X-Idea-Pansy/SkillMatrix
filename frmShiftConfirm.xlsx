@@ -60,7 +60,7 @@ Private Sub CommandButtonMissing_Click()
         MsgBox "'SelectedCell' can't be found.", vbExclamation
     End If
     Unload Me
-End Sub
+End Sub 
 
 Private Sub CommandButtonnemoc_Click()
     Dim selectedCell As String
