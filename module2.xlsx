@@ -11,6 +11,14 @@ Rem: To take the offset into account in Skill Matrix
         MsgBox "The shift is not written."
     End If
 End Function
+Sub DeleteColumnsAfterI()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Employees certif xxxx") ' Change to your actual sheet name
+
+    ' Delete all columns from J to the last column (XFD)
+    ws.Range("J:XFD").EntireColumn.Delete
+End Sub
+
 Function CleanString(ByVal str As String) As String
     Rem: Clean caracters string: no spaces, jumps of lines, etc.
     Dim accents As String
@@ -63,7 +71,7 @@ Function GetElement(ListeLignes As String, Index As Long, élémentséparateur A
     For i = 1 To Len(ListeLignes)
         endPos = InStr(startPos, ListeLignes, élémentséparateur)
         If endPos > 0 Then
-            If currentIndex = Index Then ' Si c'est le bon index, récupérer l'élément
+            If currentIndex = Index Then ' if good index, get element
                 If TypeName(ListeLignes) = "Long" Then
                     GetElement = CInt(Mid(ListeLignes, startPos, endPos - startPos))
                 Else
@@ -123,16 +131,14 @@ Sub CallUpdateProjectLists()
     Call RefreshProjects
     Dim wsDVP As Worksheet, wsCertif As Worksheet, ws As Worksheet
     Dim confirmation As VbMsgBoxResult
-
     confirmation = MsgBox("Do you really want to update the list of projects in Employees certif...?" & _
         " It will take 30 minutes minimum, you will not be able to use your computer during that time.", vbYesNo + vbQuestion, "Confirmation")
     Set wsCertif = ActiveSheet
-    
+    ' Various declarations
     If confirmation = vbYes Then
-     ' Various declarations
-         If InStr(1, CleanString(wsCertif.Name), CleanString("Employees certif")) <> 0 Then
-             Call UpdateProjectsList(wsCertif) 'update this certification worksheet
-         End If
+        If InStr(1, CleanString(wsCertif.Name), CleanString("Employees certif")) <> 0 Then
+            Call UpdateProjectsList(wsCertif) 'update this certification worksheet
+        End If
     End If
 End Sub
 Function GetColumnDiv(ws As Worksheet, DivSurname As String, firstCol As Long, lastCol As Long) As Long
@@ -154,15 +160,20 @@ Function GetSourceColumn(ws As Worksheet, wsDVP As Worksheet) As Long
         Next i
     End With
 End Function
+
 Sub UpdateProjectsList(ws As Worksheet)
 Rem: Updates worksheet ws certif with the informations in Projects worksheet
     Call DésactiverEvents
-    Dim SourceColumn As Long, i As Long, k As Long, destinationcolumn As Long, destinationraw As Long, sourceRaw As Long, lastRow As Long, lastColDest As Long
-    Dim wsDVP As Worksheet, wsProdLines As Worksheet
+    Dim SourceColumn As Long, i As Long, k As Long, destinationcolumn As Long, destinationraw As Long, sourceRaw As Long, lastRow As Long, _
+    lastColDest As Long, ColumnDATAProj As Long, lastColumn As Long, ColumnToFill As Long, certValue As String, lastRowProj As Long, NbProdProj As Long
+    Dim wsDVP As Worksheet, wsProdLines As Worksheet, wsProjects As Worksheet
     Dim dataSrc As Variant, dataDest As Variant
+    Dim DivSurname As String, ProjectToCheck As String
     Dim dictProjets As Object
+    Dim tbl As ListObject
     Set wsDVP = ThisWorkbook.Sheets("Developer")
     Set wsProdLines = ThisWorkbook.Sheets("ProductionLines")
+    Set wsProjects = ThisWorkbook.Sheets("Projects")
     destinationcolumn = 10: destinationraw = 4
     sourceRaw = 2
     ' Various declarations
@@ -170,18 +181,15 @@ Rem: Updates worksheet ws certif with the informations in Projects worksheet
     If SourceColumn = 0 Then Exit Sub
     lastRow = DerniereLigneNonVideTableParColonne("ProductionLines", SourceColumn)
     lastColDest = ws.Cells(destinationraw, ws.Columns.Count).End(xlToLeft).Column
-    
     ' Charge data
     dataSrc = wsProdLines.Range(wsProdLines.Cells(sourceRaw, SourceColumn), wsProdLines.Cells(lastRow, SourceColumn)).Value
     dataDest = ws.Range(ws.Cells(destinationraw, 1), ws.Cells(destinationraw, lastColDest)).Value
     
     ' Create dictionary
     Set dictProjets = CreateObject("Scripting.Dictionary")
-    
     For k = 1 To UBound(dataDest, 2)
         dictProjets(CleanString(dataDest(1, k))) = True
     Next k
-    
     ' Loop compare before adding
     For i = 1 To UBound(dataSrc, 1)
         Dim valeur As String
@@ -192,11 +200,24 @@ Rem: Updates worksheet ws certif with the informations in Projects worksheet
             dictProjets(valeur) = True
         End If
     Next i
-    
+
     Call SetColumnWidthFromJToLastUsed(ws)
     Call AdaptFormCells(ws)
     Call ActiverEvents
 End Sub
+    
+Function GetValueFromTable(tbl As ListObject, rowIndex As Long, headerName As String) As String
+    Dim col As ListColumn
+    On Error Resume Next
+    Set col = tbl.ListColumns(headerName)
+    If Not col Is Nothing Then
+        GetValueFromTable = col.DataBodyRange.Cells(rowIndex - tbl.Range.Row + 1, 1).Value
+    Else
+        GetValueFromTable = ""
+    End If
+    On Error GoTo 0
+End Function
+
 Function TesterValeursLigne(ByVal ligne As Long, ByVal colDebut As String, ByVal colFin As String, ByVal donneeRecherchee As Variant) As Boolean
     Dim ws As Worksheet
     Dim colStart As Long, colEnd As Long

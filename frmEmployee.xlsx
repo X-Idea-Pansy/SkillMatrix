@@ -17,6 +17,7 @@ Rem: Prepare the userform
     Next n
     Set wsSkillMatrix = ActiveSheet
     DivSurname = GetLastElement(ActiveSheet.Name, " ")
+    ThisWorkbook.Names.Add Name:="SelectedDivSurname", RefersTo:="=" & DivSurname
     On Error Resume Next
     SELECTEDName = Evaluate("SelectedOperatorName")
     selectedLine = Evaluate("SelectedLine")
@@ -35,12 +36,7 @@ Rem: Prepare the userform
     Set wsDVP = ThisWorkbook.Sheets("Developer")
     Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
     
-    For Each ws In ThisWorkbook.Worksheets
-        If InStr(1, CleanString(ws.Name), CleanString("Employees certif")) <> 0 And InStr(1, CleanString(ws.Name), CleanString(DivSurname)) <> 0 Then
-            Set wsCertif = ws
-            Exit For ' Find ws certifications for this division
-        End If
-    Next ws
+    Set wsCertif = FindWsCertif(DivSurname)
     
     With wsEmployeeData
         lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
@@ -56,6 +52,7 @@ Rem: Prepare the userform
                 If InStr(1, CleanString(.Cells(4, i).Value), CleanString(SelectedPROJECT)) <> 0 Then
                     If InStr(1, CleanString(.Cells(4, i).Value), CleanString("Úroveò" & selectedLEVEL)) <> 0 Then
                         columntoselect = i
+                        ThisWorkbook.Names.Add Name:="Selectedcolumntoselect", RefersTo:="=" & columntoselect
                     End If
                 End If
             End If
@@ -70,6 +67,16 @@ Rem: Prepare the userform
 InitError:
     MsgBox "Error during initialization: " & Err.Description
 End Sub
+Function FindWsCertif(DivSurname As String)
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        If InStr(1, CleanString(ws.Name), CleanString("Employees certif")) <> 0 And InStr(1, CleanString(ws.Name), CleanString(DivSurname)) <> 0 Then
+            Set FindWsCertif = ws
+            Exit For ' Find ws certifications for this division
+        End If
+    Next ws
+End Function
+
 Private Sub OptionButton1_Click()
     Call UpdateEmployeeList
 End Sub
@@ -150,6 +157,21 @@ Sub findNameAndIDToFill(wsCertif As Worksheet, lastRowCertif As Long, columntose
         Next i
     End With
 End Sub
+Function GetCertifValueiffindNameAndID(wsCertif As Worksheet, lastRowCertif As Long, columntoselect As Long, ID As String, SELECTEDName As String) As String
+    Dim i As Long
+    With wsCertif
+        For i = 5 To lastRowCertif
+            If .Cells(i, 3).Value = ID And .Cells(i, 2).Value = SELECTEDName Then
+                If .Cells(i, columntoselect).Value <> "" Then 'if level is not empty for this project and line on this employee's skills
+                    GetCertifValueiffindNameAndID = CStr(.Cells(i, columntoselect).Value)
+                    Exit Function
+                End If
+            End If
+        Next i
+    End With
+    GetCertifValueiffindNameAndID = "NOT_FOUND" ' Return a sentinel value if nothing found
+End Function
+
 Sub FillList(lastRowCertif As Long, lastRow As Long, selectedCellRaw As Long, SelectedCellColumn As Long, columntoselect As Long, DivSurname As String, wsSkillMatrix As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet)
     Dim i As Long
     Dim SELECTEDName As String, ID As String
@@ -196,9 +218,16 @@ Sub FillList(lastRowCertif As Long, lastRow As Long, selectedCellRaw As Long, Se
 End Sub
 Private Sub cmbEmployees_Change()
 Rem: Actions to update the userform if there is a change in it
-    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet
-    Dim lastRow As Long, i As Long
-    Dim SELECTEDName As String, fileName As String, Linkphoto As String, SelectedShift As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet
+    Dim lastRow As Long, i As Long, lastRowCertif As Long, Selectedcolumntoselect As Long
+    Dim SELECTEDName As String, fileName As String, Linkphoto As String, SelectedShift As String, selectedLine As String, selectedLEVEL As String, _
+    CertifValue As String, SelectedDivSurname As String, ID As String
+    On Error Resume Next
+    selectedLine = Evaluate("SelectedLine")
+    selectedLEVEL = Evaluate("SelectedLEVEL")
+    SelectedDivSurname = Evaluate("SelectedDivSurname")
+    Selectedcolumntoselect = Evaluate("Selectedcolumntoselect")
+    On Error GoTo 0
     SELECTEDName = cmbEmployees.Value
     Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
 
@@ -209,6 +238,14 @@ Rem: Actions to update the userform if there is a change in it
         For i = 5 To lastRow
             If Not .Rows(i).Hidden Then ' Only include visible rows
                 If .Cells(i, 2).Value = SELECTEDName Then
+                    ID = .Cells(i, 3).Value
+                    Set wsCertif = FindWsCertif(SelectedDivSurname)
+                    With wsCertif
+                        lastRowCertif = GetLastNonEmptyRow(wsCertif, 2)
+                        If lastRowCertif < 5 Then lastRowCertif = 5
+                    End With
+                    CertifValue = GetCertifValueiffindNameAndID(wsCertif, lastRowCertif, Selectedcolumntoselect, ID, SELECTEDName)
+                
                     SelectedShift = wsEmployeeData.Cells(i, 14).Value ' Shift
                     ThisWorkbook.Names.Add Name:="SelectedShift", RefersTo:="=""" & SelectedShift & """"
                     Linkphoto = .Cells(i, 7).Value ' Set photo
@@ -222,6 +259,10 @@ Rem: Actions to update the userform if there is a change in it
                         lblStartDate.Caption = .Cells(i, 5).Value
                         lblDOJO.Caption = .Cells(i, 8).Value
                         lblGlasses.Caption = .Cells(i, 9).Value
+                        If CertifValue = "NOT_FOUND" Then
+                            Exit For
+                        End If
+                        lblCertifValue = CertifValue
                         Exit For
                     Else
                         lblName.Caption = ""
@@ -229,6 +270,7 @@ Rem: Actions to update the userform if there is a change in it
                         lblStartDate.Caption = ""
                         lblDOJO.Caption = ""
                         lblGlasses.Caption = ""
+                        lblCertifValue = ""
                     End If
                 End If
             End If
