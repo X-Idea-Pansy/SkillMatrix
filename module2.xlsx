@@ -1,4 +1,3 @@
-
 Option Explicit
 Function GetInfoShift(Shift As String) As Long
 Rem: To take the offset into account in Skill Matrix
@@ -132,12 +131,15 @@ Sub CallUpdateProjectLists()
     Call RefreshProjects
     Dim wsDVP As Worksheet, wsCertif As Worksheet, ws As Worksheet
     Dim confirmation As VbMsgBoxResult
-
+    confirmation = MsgBox("Do you really want to update the list of projects in Employees certif...?" & _
+        " It will take 30 minutes minimum, you will not be able to use your computer during that time.", vbYesNo + vbQuestion, "Confirmation")
     Set wsCertif = ActiveSheet
     ' Various declarations
+    If confirmation = vbYes Then
         If InStr(1, CleanString(wsCertif.Name), CleanString("Employees certif")) <> 0 Then
             Call UpdateProjectsList(wsCertif) 'update this certification worksheet
         End If
+    End If
 End Sub
 Function GetColumnDiv(ws As Worksheet, DivSurname As String, firstCol As Long, lastCol As Long) As Long
     Dim i As Long
@@ -172,55 +174,38 @@ Rem: Updates worksheet ws certif with the informations in Projects worksheet
     Set wsDVP = ThisWorkbook.Sheets("Developer")
     Set wsProdLines = ThisWorkbook.Sheets("ProductionLines")
     Set wsProjects = ThisWorkbook.Sheets("Projects")
-    If wsDVP.ListObjects.Count = 0 Then
-        MsgBox "Table7 cannot be found in worsheet Developer", vbCritical
-        Exit Sub
-    End If
-    Set tbl = wsDVP.ListObjects("Table7") ' Assumes the table is named "Table7"
     destinationcolumn = 10: destinationraw = 4
     sourceRaw = 2
     ' Various declarations
-    DivSurname = GetLastElement(ws.Name, " ")
-    lastColumn = GetLastNonEmptyColumn(wsProjects, 10)
-    If lastColumn < 32 Then lastColumn = 32
-    ColumnDATAProj = GetColumnDiv(wsProjects, DivSurname, 30, lastColumn) 'get column where data is stored in cross per project for this division
+    SourceColumn = GetSourceColumn(ws, wsDVP)
+    If SourceColumn = 0 Then Exit Sub
+    lastRow = DerniereLigneNonVideTableParColonne("ProductionLines", SourceColumn)
+    lastColDest = ws.Cells(destinationraw, ws.Columns.Count).End(xlToLeft).Column
+    ' Charge data
+    dataSrc = wsProdLines.Range(wsProdLines.Cells(sourceRaw, SourceColumn), wsProdLines.Cells(lastRow, SourceColumn)).Value
+    dataDest = ws.Range(ws.Cells(destinationraw, 1), ws.Cells(destinationraw, lastColDest)).Value
     
-    lastRowProj = GetLastNonEmptyRow(wsProjects, 30)
-    NbProdProj = CountCross(wsProjects, 11, lastRowProj, ColumnDATAProj) 'New number of production lines in wsProjects ' column depends on Division !!!!
-    
-    ColumnToFill = 10
-    
-    For i = 11 To lastRowProj
-        lastColumn = GetLastNonEmptyColumn(wsProjects, 10)
-        ProjectToCheck = wsProjects.Cells(i, 30).Value
-        If InStr(1, wsProjects.Cells(i, ColumnDATAProj).Value, "X") <> 0 Then
-        
-            ' Check if project already exists in the destination sheet (ws)
-            For k = 10 To lastColumn
-                If InStr(1, wsDVP.Cells(4, k).Value, ProjectToCheck) <> 0 Then 'check with level !!!! or not ?
-                    'Project already exist
-                    GoTo NextProject
-                End If
-            Next k
-            
-            ' Add certifications for this project
-            For k = 10 To 13
-                certValue = GetValueFromTable(tbl, k, "Certification LEVEL")
-                'table7 header "Certification LEVEL", get value in table7 for row k and header found
-                If certValue <> "" Then
-                    ws.Cells(4, ColumnToFill).Value = ProjectToCheck & "-" & certValue
-                    ColumnToFill = ColumnToFill + 1
-                End If
-            Next k
+    ' Create dictionary
+    Set dictProjets = CreateObject("Scripting.Dictionary")
+    For k = 1 To UBound(dataDest, 2)
+        dictProjets(CleanString(dataDest(1, k))) = True
+    Next k
+    ' Loop compare before adding
+    For i = 1 To UBound(dataSrc, 1)
+        Dim valeur As String
+        valeur = RemoveElement(dataSrc(i, 1), 1, "-")
+        If Len(valeur) > 0 And Not dictProjets.exists(valeur) Then
+            lastColDest = lastColDest + 1
+            ws.Cells(destinationraw, lastColDest).Value = valeur
+            dictProjets(valeur) = True
         End If
-NextProject:
     Next i
-    
+
     Call SetColumnWidthFromJToLastUsed(ws)
     Call AdaptFormCells(ws)
     Call ActiverEvents
 End Sub
-
+    
 Function GetValueFromTable(tbl As ListObject, rowIndex As Long, headerName As String) As String
     Dim col As ListColumn
     On Error Resume Next

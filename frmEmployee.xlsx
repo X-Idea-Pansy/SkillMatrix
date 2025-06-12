@@ -48,14 +48,14 @@ Rem: Prepare the userform
         lastColumn = GetLastNonEmptyColumn(wsCertif, 4)
         If lastColumn < 10 Then lastColumn = 10
         For i = 10 To lastColumn
-            'If InStr(1, CleanString(.Cells(4, i).Value), CleanString(selectedLine)) <> 0 Then
+            If InStr(1, CleanString(.Cells(4, i).Value), CleanString(selectedLine)) <> 0 Then
                 If InStr(1, CleanString(.Cells(4, i).Value), CleanString(SelectedPROJECT)) <> 0 Then
                     If InStr(1, CleanString(.Cells(4, i).Value), CleanString("Úroveò" & selectedLEVEL)) <> 0 Then
                         columntoselect = i
                         ThisWorkbook.Names.Add Name:="Selectedcolumntoselect", RefersTo:="=" & columntoselect
                     End If
                 End If
-            'End If
+            End If
         Next i
     End With
     Call FillList(lastRowCertif, lastRow, selectedCellRaw, SelectedCellColumn, columntoselect, DivSurname, wsSkillMatrix, wsEmployeeData, wsCertif)
@@ -133,13 +133,13 @@ Sub UpdateEmployeeList()
         lastColumn = GetLastNonEmptyColumn(wsCertif, 4)
         If lastColumn < 10 Then lastColumn = 10
         For i = 10 To lastColumn
-            'If InStr(1, CleanString(.Cells(4, i).Value), CleanString(selectedLine)) <> 0 Then
+            If InStr(1, CleanString(.Cells(4, i).Value), CleanString(selectedLine)) <> 0 Then
                 If InStr(1, CleanString(.Cells(4, i).Value), CleanString(SelectedPROJECT)) <> 0 Then
                     If InStr(1, CleanString(.Cells(4, i).Value), CleanString("Úroveò" & selectedLEVEL)) <> 0 Then
                         columntoselect = i
                     End If
                 End If
-            'End If
+            End If
         Next i
     End With
     Call FillList(lastRowCertif, lastRow, selectedCellRaw, SelectedCellColumn, columntoselect, DivSurname, wsSkillMatrix, wsEmployeeData, wsCertif)
@@ -157,19 +157,21 @@ Sub findNameAndIDToFill(wsCertif As Worksheet, lastRowCertif As Long, columntose
         Next i
     End With
 End Sub
-Function GetCertifValueiffindNameAndID(wsCertif As Worksheet, lastRowCertif As Long, columntoselect As Long, ID As String, SELECTEDName As String)
+Function GetCertifValueiffindNameAndID(wsCertif As Worksheet, lastRowCertif As Long, columntoselect As Long, ID As String, SELECTEDName As String) As String
     Dim i As Long
     With wsCertif
         For i = 5 To lastRowCertif
             If .Cells(i, 3).Value = ID And .Cells(i, 2).Value = SELECTEDName Then
-                If wsCertif.Cells(i, columntoselect).Value <> "" Then 'if level is not empty for this project and line on this employee's skills
-                    GetCertifValueiffindNameAndID = .Cells(i, columntoselect).Value
+                If .Cells(i, columntoselect).Value <> "" Then 'if level is not empty for this project and line on this employee's skills
+                    GetCertifValueiffindNameAndID = CStr(.Cells(i, columntoselect).Value)
                     Exit Function
                 End If
             End If
         Next i
     End With
+    GetCertifValueiffindNameAndID = "NOT_FOUND" ' Return a sentinel value if nothing found
 End Function
+
 Sub FillList(lastRowCertif As Long, lastRow As Long, selectedCellRaw As Long, SelectedCellColumn As Long, columntoselect As Long, DivSurname As String, wsSkillMatrix As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet)
     Dim i As Long
     Dim SELECTEDName As String, ID As String
@@ -257,7 +259,7 @@ Rem: Actions to update the userform if there is a change in it
                         lblStartDate.Caption = .Cells(i, 5).Value
                         lblDOJO.Caption = .Cells(i, 8).Value
                         lblGlasses.Caption = .Cells(i, 9).Value
-                        If CertifValue Is Nothing Then
+                        If CertifValue = "NOT_FOUND" Then
                             Exit For
                         End If
                         lblCertifValue = CertifValue

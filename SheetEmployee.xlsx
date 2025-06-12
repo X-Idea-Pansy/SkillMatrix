@@ -29,9 +29,7 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
         End If
 
         ' Prompt user to see certifications
-        'response = MsgBox("Do you want to see the certifications of this employee? ID: " & currentID, vbYesNo + vbQuestion, "Employee Certifications")
-        response = vbNo ' take out !!!
-        
+        response = MsgBox("Do you want to see the certifications of this employee? ID: " & currentID, vbYesNo + vbQuestion, "Employee Certifications")
         If response = vbYes Then
             Division = Me.Cells(clickedCell.Row, 10).Value
             If Division = "" Then
