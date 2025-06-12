@@ -1,0 +1,58 @@
+Option Explicit
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    Dim lineInfo As String, shiftInfo As String, currentName As String, titleInfo As String, confirmMsg As String, DivSurname As String, Division As String
+    Dim rowNum As Long, colNum As Long, lineLevel As Long, lastRow As Long, currentID As Variant
+    Dim tableRange As Range, clickedCell As Range
+    Dim wsCertif As Worksheet, ws As Worksheet
+    Dim response As VbMsgBoxResult
+    ' Various declarations
+    If Target.Cells.Count > 1 Then Exit Sub
+
+    ' Get row and column numbers of the clicked cell
+    rowNum = Target.Row
+    colNum = Target.Column
+
+    ' Last row in assignment area (based on column B)
+    lastRow = GetLastNonEmptyRow(Me, 2) 'Me.Range("B4:B" & Me.Rows.Count).Find("*", , , , xlByRows, xlPrevious).Row
+    If lastRow < 5 Then lastRow = 5
+
+    ' Assignment range: B5:I[lastRow]
+    Set tableRange = Me.Range("B5:I" & lastRow)
+
+    If Not Intersect(Target, tableRange) Is Nothing Then
+        Set clickedCell = Target
+
+        ' Get current employee ID from column C (3rd column) of the same row
+        currentID = Me.Cells(clickedCell.Row, 3).Value
+        If IsEmpty(currentID) Or currentID = "" Then
+            currentID = " "
+        End If
+
+        ' Prompt user to see certifications
+        'response = MsgBox("Do you want to see the certifications of this employee? ID: " & currentID, vbYesNo + vbQuestion, "Employee Certifications")
+        response = vbNo ' take out !!!
+        
+        If response = vbYes Then
+            Division = Me.Cells(clickedCell.Row, 10).Value
+            If Division = "" Then
+                MsgBox "The Division could not be found for this employee in worksheet 'Employees DATA'."
+                Exit Sub
+            End If
+            DivSurname = GetLastElement(Division, " ")
+            For Each ws In ThisWorkbook.Worksheets
+                If InStr(1, CleanString(ws.Name), CleanString("Employees certif")) <> 0 And InStr(1, CleanString(ws.Name), CleanString(DivSurname)) <> 0 Then
+                    Set wsCertif = ws
+                    Exit For ' Find ws certifications for this division
+                End If
+            Next ws
+            wsCertif.Visible = True
+            wsCertif.Activate
+            wsCertif.Cells(clickedCell.Row, 2).Select
+        End If
+    End If
+End Sub
+
+
+
+
+

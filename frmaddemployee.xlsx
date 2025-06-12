@@ -1,0 +1,172 @@
+Option Explicit
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    On Error GoTo InitError
+    Dim n As Name
+    For Each n In ThisWorkbook.Names
+        Debug.Print n.Name, n.RefersTo
+    Next n
+    Dim i As Long
+    ' Various declarations
+    frmAddEmployee.Width = 700
+    frmAddEmployee.Height = 600
+
+    TextBoxDate = Format(Now, "dd/mm/yyyy") ' Pre-fill form with current slot info
+    Dim wsDVP As Worksheet
+    Dim txtName2 As String
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+
+    For i = 1 To 25
+        If i > 10 Then
+            AddItemWithoutDuplicates ComboBoxDivision, wsDVP.Cells(i, 8).Value ' to choose the division
+        End If
+    Next i
+
+    Exit Sub
+InitError:
+    MsgBox "Error during initialization: " & Err.Description
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, SelectedProductionLine As String, SelectedPROJECT As String
+    Dim DOJO As String, Glasses As String, Position As String, ID As String, Name As String, StartDate As String, positioncellule As String
+    Dim valeurSelectionnee As String, Division As String, DivisionSurname As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet
+    Dim lastRow As Long, columntoselect As Long, selectedLEVEL As Long, selectedColor As Long, ligne As Long, i As Long
+    Dim listeValeurs As Variant
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    ' Various declarations
+    On Error Resume Next
+    selectedLine = Evaluate("SelectedLine")
+    SelectedPROJECT = Evaluate("SelectedPROJECT")
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    On Error GoTo 0
+    
+    If ComboBoxDivision.Value = "" Then
+        MsgBox "Please, select the division to which this employee is associated.", vbExclamation
+        Exit Sub
+    End If
+    For i = 11 To 25
+        If InStr(1, CleanString(wsDVP.Cells(i, 8).Value), CleanString(ComboBoxDivision.Value)) <> 0 Then
+            DivisionSurname = wsDVP.Cells(i, 9).Value 'surname of the division to find the worksheets accordingly
+        End If
+    Next i
+    If DivisionSurname = "" Then
+        MsgBox "The Division surname could not be found in worksheet 'Developer'."
+        Exit Sub
+    End If
+    Set wsCertif = ThisWorkbook.Sheets("Employees certif " & DivisionSurname)
+    'certif worksheet according to division chosen
+
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2) + 1
+        If lastRow < 5 Then lastRow = 5
+    End With
+    
+    If OptionButton4.Value Then ' DOJO
+        DOJO = "OK"
+    ElseIf OptionButton5.Value Then
+        DOJO = "NOK"
+    Else
+        MsgBox "Please select OK or NOK for DOJO before validating.", vbExclamation
+        Exit Sub
+    End If
+    If OptionButton6.Value Then ' Glasses
+        Glasses = "Yes"
+    ElseIf OptionButton7.Value Then
+        Glasses = "No"
+    Else
+        MsgBox "Please select Yes or No for glasses before validating.", vbExclamation
+        Exit Sub
+    End If
+    
+    If OptionButton8.Value Then ' Position
+        Position = "OP"
+    ElseIf OptionButton9.Value Then
+        Position = "BT"
+    ElseIf OptionButton10.Value Then
+        Position = "LL"
+    ElseIf OptionButton11.Value Then
+        Position = "GL"
+    ElseIf OptionButton12.Value Then
+        Position = "MOP"
+    ElseIf OptionButton13.Value Then
+        Position = "Other"
+    Else
+        MsgBox "Please select a position before validating.", vbExclamation
+        Exit Sub
+    End If
+    
+    ID = TextBoxID.Value
+    Name = TextBoxName.Value
+    StartDate = TextBoxDate.Value
+    If ID = "" Or Name = "" Then
+        MsgBox "Please indicate a name and an ID before validating.", vbExclamation
+        Exit Sub
+    End If
+    With wsEmployeeData
+        For i = 5 To lastRow
+            If CleanString(.Cells(i, 2).Value) = CleanString(Name) Then
+                MsgBox "This name already exist"
+                Exit Sub
+            ElseIf ((CleanString(GetElement(.Cells(i, 2).Value, 1, " ")) = CleanString(GetElement(Name, 1, " ")) Or CleanString(GetElement(.Cells(i, 2).Value, 2, " ")) = CleanString(GetElement(Name, 1, " ")))) Then
+                If ((CleanString(GetElement(.Cells(i, 2).Value, 1, " ")) = CleanString(GetElement(Name, 2, " ")) Or CleanString(GetElement(.Cells(i, 2).Value, 2, " ")) = CleanString(GetElement(Name, 2, " ")))) Then
+                    MsgBox "This name already exist"
+                    Exit Sub
+                End If
+            ElseIf CleanString(.Cells(i, 3).Value) = CleanString(ID) Then
+                MsgBox "This ID already exist"
+                Exit Sub
+            End If
+        Next i
+        .Cells(lastRow, 2).Value = Name
+        .Cells(lastRow, 3).Value = ID
+        .Cells(lastRow, 4).Value = Position
+        .Cells(lastRow, 5).Value = StartDate
+        .Cells(lastRow, 6).Value = ".jpg"
+        '.Cells(lastRow, 7).Value = 'done automatically through table formula
+        .Cells(lastRow, 8).Value = DOJO
+        .Cells(lastRow, 9).Value = Glasses
+        '.Cells(lastRow, 11).Value = 'done automatically through table formula
+        If TextBoxComments.Value <> "" Then .Cells(lastRow, 12).Value = TextBoxComments.Value
+        .Cells(lastRow, 13).Value = "JAPA"
+        
+        Dim valList As String
+        positioncellule = .Cells(lastRow, 10).Address
+        valList = wsEmployeeData.Range(positioncellule).Validation.Formula1
+        ' Remove '=' if it exists
+        If CleanString(Left(valList, 1)) = "=" Then valList = Mid(valList, 2)
+        
+        ' Get actual list from named range or direct range
+        On Error Resume Next
+        listeValeurs = Evaluate(valList)
+        On Error GoTo 0
+         ' Go through every element in list
+        If IsArray(listeValeurs) Then
+            For i = LBound(listeValeurs, 1) To UBound(listeValeurs, 1)
+                valeurSelectionnee = Trim(listeValeurs(i, 1))
+                If valeurSelectionnee <> "" Then
+                    If InStr(1, CleanString(valeurSelectionnee), CleanString(DivisionSurname)) <> 0 Then
+                        .Range(positioncellule).Value = valeurSelectionnee
+                        ''''
+                        Call UpdateWSCertifNames(wsCertif, Name, ID)
+                        
+                        Unload Me
+                        Exit Sub
+                    End If
+                End If
+            Next i
+        Else
+            MsgBox "Unable to extract validation list from: " & valList, vbExclamation
+        End If
+    End With
+End Sub
+
+
+
+
+

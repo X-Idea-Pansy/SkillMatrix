@@ -1,0 +1,312 @@
+Private photoPath As String
+Option Explicit
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, SelectedDivision As String, _
+        DivSurname As String, SelectedPROJECT As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet, wsSkillMatrix As Worksheet
+    Dim lastRow As Long, columntoselect As Long, lastColumn As Long, selectedLEVEL As Long, selectedColor As Long, i As Long, _
+        selectedCellRaw As Long, SelectedOffset As Long, SelectedCellColumn As Long, lastRowCertif As Long
+    On Error GoTo InitError
+    Dim n As Name
+    frmEmployee.Width = 600
+    frmEmployee.Height = 600
+    For Each n In ThisWorkbook.Names
+        Debug.Print n.Name, n.RefersTo
+    Next n
+    Set wsSkillMatrix = ActiveSheet
+    DivSurname = GetLastElement(ActiveSheet.Name, " ")
+    ThisWorkbook.Names.Add Name:="SelectedDivSurname", RefersTo:="=" & DivSurname
+    On Error Resume Next
+    SELECTEDName = Evaluate("SelectedOperatorName")
+    selectedLine = Evaluate("SelectedLine")
+    selectedLEVEL = Evaluate("SelectedLEVEL")
+    SelectedShift = Evaluate("SelectedSHIFT")
+    selectedCell = Evaluate("SelectedCell")
+    selectedCellRaw = Evaluate("SelectedCellRaw")
+    SelectedCellColumn = Evaluate("SelectedCellColumn")
+    selectedColor = Evaluate("colorCode")
+    SelectedDivision = Evaluate("SelectedDivision")
+    SelectedPROJECT = Evaluate("SelectedPROJECT")
+    SelectedOffset = Evaluate("SelectedOffset")
+    On Error GoTo 0
+    '''''
+    
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    
+    Set wsCertif = FindWsCertif(DivSurname)
+    
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+    End With
+    With wsCertif
+        lastRowCertif = GetLastNonEmptyRow(wsCertif, 2)
+        If lastRowCertif < 5 Then lastRowCertif = 5
+        lastColumn = GetLastNonEmptyColumn(wsCertif, 4)
+        If lastColumn < 10 Then lastColumn = 10
+        For i = 10 To lastColumn
+            'If InStr(1, CleanString(.Cells(4, i).Value), CleanString(selectedLine)) <> 0 Then
+                If InStr(1, CleanString(.Cells(4, i).Value), CleanString(SelectedPROJECT)) <> 0 Then
+                    If InStr(1, CleanString(.Cells(4, i).Value), CleanString("Úroveò" & selectedLEVEL)) <> 0 Then
+                        columntoselect = i
+                        ThisWorkbook.Names.Add Name:="Selectedcolumntoselect", RefersTo:="=" & columntoselect
+                    End If
+                End If
+            'End If
+        Next i
+    End With
+    Call FillList(lastRowCertif, lastRow, selectedCellRaw, SelectedCellColumn, columntoselect, DivSurname, wsSkillMatrix, wsEmployeeData, wsCertif)
+    ' Pre-fill form with current slot info
+    If selectedLine <> "" And (selectedCellRaw <> 11 And SelectedCellColumn < 15) Then
+        lblLine.Caption = "Production line: " & selectedLine
+    End If
+    Exit Sub
+InitError:
+    MsgBox "Error during initialization: " & Err.Description
+End Sub
+Function FindWsCertif(DivSurname As String)
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        If InStr(1, CleanString(ws.Name), CleanString("Employees certif")) <> 0 And InStr(1, CleanString(ws.Name), CleanString(DivSurname)) <> 0 Then
+            Set FindWsCertif = ws
+            Exit For ' Find ws certifications for this division
+        End If
+    Next ws
+End Function
+
+Private Sub OptionButton1_Click()
+    Call UpdateEmployeeList
+End Sub
+Private Sub OptionButton2_Click()
+    Call UpdateEmployeeList
+End Sub
+Private Sub OptionButton3_Click()
+    Call UpdateEmployeeList
+End Sub
+
+Sub UpdateEmployeeList()
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, SelectedDivision As String, _
+    DivSurname As String, SelectedPROJECT As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet, wsSkillMatrix As Worksheet
+    Dim lastRow As Long, columntoselect As Long, lastColumn As Long, selectedLEVEL As Long, selectedColor As Long, i As Long, _
+    selectedCellRaw As Long, SelectedOffset As Long, SelectedCellColumn As Long, lastRowCertif As Long
+    Dim n As Name
+    frmEmployee.Width = 600
+    frmEmployee.Height = 600
+    For Each n In ThisWorkbook.Names
+        Debug.Print n.Name, n.RefersTo
+    Next n
+    Set wsSkillMatrix = ActiveSheet
+    DivSurname = GetLastElement(ActiveSheet.Name, " ")
+    On Error Resume Next
+    SELECTEDName = Evaluate("SelectedOperatorName")
+    selectedLine = Evaluate("SelectedLine")
+    selectedLEVEL = Evaluate("SelectedLEVEL")
+    SelectedShift = Evaluate("SelectedSHIFT")
+    selectedCell = Evaluate("SelectedCell")
+    selectedCellRaw = Evaluate("SelectedCellRaw")
+    SelectedCellColumn = Evaluate("SelectedCellColumn")
+    selectedColor = Evaluate("colorCode")
+    SelectedDivision = Evaluate("SelectedDivision")
+    SelectedPROJECT = Evaluate("SelectedPROJECT")
+    SelectedOffset = Evaluate("SelectedOffset")
+    On Error GoTo 0
+    '''''
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    
+    For Each ws In ThisWorkbook.Worksheets
+        If InStr(1, CleanString(ws.Name), CleanString("Employees certif")) <> 0 And InStr(1, CleanString(ws.Name), CleanString(DivSurname)) <> 0 Then
+            Set wsCertif = ws
+            Exit For ' Find ws certifications for this division
+        End If
+    Next ws
+    
+    lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+    If lastRow < 5 Then lastRow = 5
+    With wsCertif
+        lastRowCertif = GetLastNonEmptyRow(wsCertif, 2)
+        If lastRowCertif < 5 Then lastRowCertif = 5
+        lastColumn = GetLastNonEmptyColumn(wsCertif, 4)
+        If lastColumn < 10 Then lastColumn = 10
+        For i = 10 To lastColumn
+            'If InStr(1, CleanString(.Cells(4, i).Value), CleanString(selectedLine)) <> 0 Then
+                If InStr(1, CleanString(.Cells(4, i).Value), CleanString(SelectedPROJECT)) <> 0 Then
+                    If InStr(1, CleanString(.Cells(4, i).Value), CleanString("Úroveò" & selectedLEVEL)) <> 0 Then
+                        columntoselect = i
+                    End If
+                End If
+            'End If
+        Next i
+    End With
+    Call FillList(lastRowCertif, lastRow, selectedCellRaw, SelectedCellColumn, columntoselect, DivSurname, wsSkillMatrix, wsEmployeeData, wsCertif)
+End Sub
+Sub findNameAndIDToFill(wsCertif As Worksheet, lastRowCertif As Long, columntoselect As Long, ID As String, SELECTEDName As String)
+    Dim i As Long
+    With wsCertif
+        For i = 5 To lastRowCertif
+            If .Cells(i, 3).Value = ID And .Cells(i, 2).Value = SELECTEDName Then
+                If wsCertif.Cells(i, columntoselect).Value <> "" Then 'if level is not empty for this project and line on this employee's skills
+                    cmbEmployees.AddItem .Cells(i, 2).Value
+                    Exit Sub
+                End If
+            End If
+        Next i
+    End With
+End Sub
+Function GetCertifValueiffindNameAndID(wsCertif As Worksheet, lastRowCertif As Long, columntoselect As Long, ID As String, SELECTEDName As String)
+    Dim i As Long
+    With wsCertif
+        For i = 5 To lastRowCertif
+            If .Cells(i, 3).Value = ID And .Cells(i, 2).Value = SELECTEDName Then
+                If wsCertif.Cells(i, columntoselect).Value <> "" Then 'if level is not empty for this project and line on this employee's skills
+                    GetCertifValueiffindNameAndID = .Cells(i, columntoselect).Value
+                    Exit Function
+                End If
+            End If
+        Next i
+    End With
+End Function
+Sub FillList(lastRowCertif As Long, lastRow As Long, selectedCellRaw As Long, SelectedCellColumn As Long, columntoselect As Long, DivSurname As String, wsSkillMatrix As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet)
+    Dim i As Long
+    Dim SELECTEDName As String, ID As String
+    cmbEmployees.Clear
+    With wsEmployeeData
+        For i = 5 To lastRow
+            If Not .Rows(i).Hidden Then ' Only include visible rows
+                SELECTEDName = .Cells(i, 2).Value
+                ID = .Cells(i, 3).Value
+                If CleanString(.Cells(i, 13).Value) <> "UPP" Then 'JAPA employee only
+                    If (selectedCellRaw > 7 And selectedCellRaw < 11 And SelectedCellColumn > 15 And SelectedCellColumn < 19) Then ' case LL, GL
+                        If (OptionButton1.Value = True) Then
+                            If InStr(1, CleanString(.Cells(i, 11).Value), CleanString(DivSurname)) <> 0 Then  ' test same division
+                                If InStr(1, CleanString(.Cells(i, 14).Value), CleanString(wsSkillMatrix.Cells(selectedCellRaw, 3).Value)) <> 0 Then  ' test same shift
+                                    cmbEmployees.AddItem .Cells(i, 2).Value
+                                End If
+                            End If
+                        ElseIf (OptionButton2.Value = True) Then
+                            If InStr(1, CleanString(.Cells(i, 11).Value), CleanString(DivSurname)) <> 0 Then  ' test same division
+                                cmbEmployees.AddItem .Cells(i, 2).Value 'all shifts for this division
+                            End If
+                        ElseIf (OptionButton3.Value = True) Then 'case every division person, regardless of skill
+                            cmbEmployees.AddItem .Cells(i, 2).Value
+                        End If
+                    Else ' case OP, MOP, BT
+                        If (OptionButton1.Value = True) Then
+                            If InStr(1, CleanString(.Cells(i, 11).Value), CleanString(DivSurname)) <> 0 Then  ' test same division
+                                If InStr(1, CleanString(.Cells(i, 14).Value), CleanString(wsSkillMatrix.Cells(selectedCellRaw, 3).Value)) <> 0 Then  ' test same shift
+                                    Call findNameAndIDToFill(wsCertif, lastRowCertif, columntoselect, ID, SELECTEDName)
+                                End If
+                            End If
+                        ElseIf (OptionButton2.Value = True) Then
+                            If InStr(1, CleanString(.Cells(i, 11).Value), CleanString(DivSurname)) <> 0 Then  ' test same division
+                                Call findNameAndIDToFill(wsCertif, lastRowCertif, columntoselect, ID, SELECTEDName) 'all shifts for this division
+                            End If
+                        ElseIf (OptionButton3.Value = True) Then 'case every division person, regardless of skill
+                            cmbEmployees.AddItem .Cells(i, 2).Value
+                        End If
+                    End If
+                End If
+            End If
+        Next i
+    End With
+End Sub
+Private Sub cmbEmployees_Change()
+Rem: Actions to update the userform if there is a change in it
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet
+    Dim lastRow As Long, i As Long, lastRowCertif As Long, Selectedcolumntoselect As Long
+    Dim SELECTEDName As String, fileName As String, Linkphoto As String, SelectedShift As String, selectedLine As String, selectedLEVEL As String, _
+    CertifValue As String, SelectedDivSurname As String, ID As String
+    On Error Resume Next
+    selectedLine = Evaluate("SelectedLine")
+    selectedLEVEL = Evaluate("SelectedLEVEL")
+    SelectedDivSurname = Evaluate("SelectedDivSurname")
+    Selectedcolumntoselect = Evaluate("Selectedcolumntoselect")
+    On Error GoTo 0
+    SELECTEDName = cmbEmployees.Value
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+
+        For i = 5 To lastRow
+            If Not .Rows(i).Hidden Then ' Only include visible rows
+                If .Cells(i, 2).Value = SELECTEDName Then
+                    ID = .Cells(i, 3).Value
+                    Set wsCertif = FindWsCertif(SelectedDivSurname)
+                    With wsCertif
+                        lastRowCertif = GetLastNonEmptyRow(wsCertif, 2)
+                        If lastRowCertif < 5 Then lastRowCertif = 5
+                    End With
+                    CertifValue = GetCertifValueiffindNameAndID(wsCertif, lastRowCertif, Selectedcolumntoselect, ID, SELECTEDName)
+                
+                    SelectedShift = wsEmployeeData.Cells(i, 14).Value ' Shift
+                    ThisWorkbook.Names.Add Name:="SelectedShift", RefersTo:="=""" & SelectedShift & """"
+                    Linkphoto = .Cells(i, 7).Value ' Set photo
+                    If Dir(Linkphoto) <> "" And CleanString(.Cells(i, 13).Value) <> "UPP" Then
+                        imgPhoto.Picture = LoadPicture(Linkphoto)
+                    End If
+                    If CleanString(.Cells(i, 13).Value) <> "UPP" Then
+                        ' Set info labels/textboxes
+                        lblName.Caption = .Cells(i, 2).Value & " - " & .Cells(i, 4).Value
+                        lblPosition.Caption = .Cells(i, 4).Value
+                        lblStartDate.Caption = .Cells(i, 5).Value
+                        lblDOJO.Caption = .Cells(i, 8).Value
+                        lblGlasses.Caption = .Cells(i, 9).Value
+                        If CertifValue Is Nothing Then
+                            Exit For
+                        End If
+                        lblCertifValue = CertifValue
+                        Exit For
+                    Else
+                        lblName.Caption = ""
+                        lblPosition.Caption = ""
+                        lblStartDate.Caption = ""
+                        lblDOJO.Caption = ""
+                        lblGlasses.Caption = ""
+                        lblCertifValue = ""
+                    End If
+                End If
+            End If
+        Next i
+    End With
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    Dim wsSkillMatrix As Worksheet, wsEmployeeData As Worksheet
+    Dim selectedCellRaw As Long, SelectedOffset As Long
+    Dim SelectedShift As String
+    Dim selectedCell As Range
+    On Error Resume Next
+    Set wsSkillMatrix = ActiveSheet
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    Set selectedCell = Range(Evaluate("SelectedCell"))
+    selectedCellRaw = Evaluate("SelectedCellRaw")
+    SelectedShift = Evaluate("SelectedShift")
+    SelectedOffset = Evaluate("SelectedOffset")
+    On Error GoTo 0
+    
+    With wsEmployeeData
+        If Not selectedCell Is Nothing Then
+            If InStr(1, CleanString(SelectedShift), CleanString(wsSkillMatrix.Cells(selectedCellRaw, 3).Value)) <> 0 Then
+                selectedCell.Value = cmbEmployees.Value
+            Else
+                selectedCell.Value = cmbEmployees.Value & " - " & SelectedShift
+            End If
+            'MsgBox "Operator assigned to the line!", vbInformation
+            Unload Me
+        Else
+            MsgBox "Couldn't find the target cell.", vbExclamation
+        End If
+    End With
+End Sub
+
+
+

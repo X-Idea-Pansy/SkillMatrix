@@ -1,0 +1,69 @@
+Option Explicit
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, SelectedProductionLine As String, SelectedPROJECT As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsSkillMatrix As Worksheet
+    Dim lastRow As Long, columntoselect As Long, lastColumn As Long, selectedLEVEL As Long, selectedColor As Long, i As Long
+    Dim n As Name
+    frmCMMvalid.Width = 500
+    frmCMMvalid.Height = 400
+    On Error GoTo InitError
+    For Each n In ThisWorkbook.Names
+        Debug.Print n.Name, n.RefersTo
+    Next n
+    On Error Resume Next
+    Set wsSkillMatrix = ActiveSheet
+    ' Various declarations
+    
+    selectedLine = Evaluate("SelectedLine")
+    SelectedPROJECT = Evaluate("SelectedPROJECT")
+    On Error GoTo 0
+
+    ' Pre-fill form with current slot info
+    If selectedLine <> "" Then
+        lblProjectChange.Caption = "Production line: " & selectedLine & vbCrLf & _
+                                    vbCrLf & "Project: " & SelectedPROJECT
+    End If
+
+    Exit Sub
+InitError:
+    MsgBox "Error during initialization: " & Err.Description
+End Sub
+
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    Dim selectedCell As Range
+    Dim txt As String
+    ' Various declarations
+    
+    On Error Resume Next
+    'SelectedCMMTarget = Evaluate("SelectedCMMTarget")
+    Set selectedCell = Range(Evaluate("SelectedCMMTarget"))
+    On Error GoTo 0
+    
+    If OptionButton1.Value Then
+        txt = "Adjusting"
+    ElseIf OptionButton2.Value Then
+        txt = "NG"
+    ElseIf OptionButton3.Value Then
+        txt = "OK"
+    Else
+        MsgBox "Please select an option before validating.", vbExclamation
+        Exit Sub
+    End If
+    
+    If Not selectedCell Is Nothing Then
+        selectedCell.Value = txt
+        'MsgBox "Operator assigned to the line!", vbInformation
+        Unload Me
+    Else
+        MsgBox "Couldn't find the target cell.", vbExclamation
+    End If
+End Sub
+
+
+
+

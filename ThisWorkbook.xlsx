@@ -1,0 +1,74 @@
+Option Explicit
+Private Sub Workbook_Open()
+    Rem : Visual for worsheets
+    Call DésactiverEvents
+    
+    Dim wsDVP As Worksheet, wsPageAccueil As Worksheet, wsSkillMatrix As Worksheet, wsEmployeeData As Worksheet, wsFind As Worksheet
+    Dim wsActuel As Worksheet, Feuilles() As Worksheet, wsProjects As Worksheet, wsSkillMatrixMS As Worksheet
+    Dim i As Long
+    ' Various declarations
+    Set wsPageAccueil = ThisWorkbook.Sheets("Menu")
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsProjects = ThisWorkbook.Sheets("Projects")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    Set wsFind = ThisWorkbook.Sheets("Find an Employee")
+     
+    Dim ws As Worksheet
+    For Each ws In ActiveWorkbook.Worksheets
+        Call FitPage(ws, wsFind, wsPageAccueil, wsProjects)
+    Next ws
+     
+    Call CacherToutesLesFeuillesSaufUne(wsPageAccueil)
+    wsPageAccueil.Activate
+    
+    Call ActiverEvents ' Réactivate alerts and events
+End Sub
+Sub CacherToutesLesFeuillesSaufUne(wsToKeep As Worksheet)
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        If ws.Name <> wsToKeep.Name Then
+            ws.Visible = xlSheetHidden
+        Else
+            ws.Visible = xlSheetVisible
+        End If
+    Next ws
+End Sub
+Sub FitPage(ws As Worksheet, wsFind As Worksheet, wsPageAccueil As Worksheet, wsProjects As Worksheet)
+    Dim zoomFactor As Long, col As Long
+    Dim screenWidth As Double, totalWidth As Double
+    With ws
+        .Activate
+        Call GoSimiliFullScreen(ws)
+        ActiveWindow.ScrollColumn = 1 ' columm A
+        ActiveWindow.ScrollRow = 1    ' line 1
+        .Range("A1").Select
+        ' Activate the worksheet and center so that A1 is visible
+
+        totalWidth = 0
+        If InStr(1, ws.Name, "Skill Matrix ") <> 0 Or InStr(1, ws.Name, wsPageAccueil.Name) <> 0 Then  'If i < 2 Or i = 6 Then
+            For col = 1 To 35 ' column A (1) to column AO (41)
+                totalWidth = totalWidth + .Columns(col).Width
+            Next col
+        ElseIf InStr(1, ws.Name, wsFind.Name) <> 0 Then
+            For col = 1 To 33 ' column A (1) to column AO (41)
+                totalWidth = totalWidth + .Columns(col).Width
+            Next col
+        ElseIf InStr(1, ws.Name, wsProjects.Name) <> 0 Then
+            For col = 1 To 55 ' column A (1) to column AO (41)
+                totalWidth = totalWidth + .Columns(col).Width
+            Next col
+        Else
+            For col = 1 To 26 ' column A (1) to column X (24)
+                totalWidth = totalWidth + .Columns(col).Width
+            Next col
+        End If
+        ' Calculate length between column
+        
+        screenWidth = Application.Width ' Obtain length of screen (in pixels)
+        zoomFactor = Int((screenWidth / totalWidth) * 100) ' Obtain zoom factor
+        If zoomFactor > 150 Then zoomFactor = 150
+        If zoomFactor < 30 Then zoomFactor = 30
+        ' Limit zoom to a maximum of 150% and minimum of 50%
+        ActiveWindow.Zoom = zoomFactor ' Apply zoom
+    End With
+End Sub

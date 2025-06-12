@@ -1,0 +1,185 @@
+Option Explicit
+
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim i As Long, k As Long
+    Dim wsDVP As Worksheet
+    Dim txtName2 As String
+    ' Various declarations
+    frmAddProductionLine.Width = 800
+    frmAddProductionLine.Height = 500
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    For i = 1 To 25
+        If i < 11 Then ComboBoxNumber.AddItem i ' number of projects for this new production line
+        If i > 10 Then ' Add levels (LVL) without doubles
+            For k = 1 To 10
+                txtName2 = "ComboBox" & k
+                AddItemWithoutDuplicates Me.Controls(txtName2), wsDVP.Cells(i, 19).Value ' to choose the level required for a project
+                AddItemWithoutDuplicates ComboBoxDivision, wsDVP.Cells(i, 8).Value ' to choose the production line
+            Next k
+        End If
+    Next i
+End Sub
+
+Private Sub ComboBoxNumber_Change()
+    Dim i As Long, selectedNumber As Long
+    Dim txtName As String, txtName2 As String, lblName As String, txtName3 As String
+    ' Various declarations
+    selectedNumber = CInt(ComboBoxNumber.Value)
+
+    For i = 1 To 10 ' Adjust this to your actual number of TextBoxProject controls
+        txtName = "TextBoxProject" & i
+        lblName = "lblProject" & i
+        txtName2 = "ComboBox" & i
+        
+        If Me.Controls(txtName) Is Nothing Or Me.Controls(lblName) Is Nothing Or Me.Controls(txtName2) Is Nothing Then
+            ' Skip if the control doesn't exist
+        Else
+            Me.Controls(txtName).Visible = (i <= selectedNumber)
+            Me.Controls(lblName).Visible = (i <= selectedNumber)
+            Me.Controls(txtName2).Visible = (i <= selectedNumber)
+        End If
+    Next i
+    
+    ThisWorkbook.Names.Add Name:="SelectedNumberOFProjects", RefersTo:="=""" & selectedNumber & """"
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    Dim SelectedNumberOFProjects As Long, i As Long, lastColumn As Long, lastRowDVP As Long, lastRow As Long
+    Dim wsProjects As Worksheet, f As Worksheet, wsCertif As Worksheet, wsDVP As Worksheet
+    Dim txtName As String, txtName2 As String, txtName3 As String, DivisionSurname As String
+    Dim response As VbMsgBoxResult
+    Dim tempVal As Variant
+    Set wsProjects = ThisWorkbook.Sheets("Projects")
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    ' Various declarations
+    
+    On Error Resume Next
+    SelectedNumberOFProjects = CInt(Evaluate("SelectedNumberOFProjects"))
+    On Error GoTo 0
+
+    tempVal = Evaluate("SelectedNumberOFProjects")
+    
+    If IsNumeric(tempVal) Then
+        SelectedNumberOFProjects = CInt(tempVal)
+    Else
+        MsgBox "Invalid number of projects selected."
+        Exit Sub
+    End If
+    
+    If ComboBoxDivision.Value = "" Then 'name for division
+        MsgBox "You have to select a division"
+        Exit Sub
+    ElseIf ComboBoxNumber.Value = "" Then ' number of projects
+        MsgBox "You have to select a number of projects for this production line"
+        Exit Sub
+    ElseIf TextBoxLine = "" Then
+        MsgBox "You have to give a name to the new production line"
+        Exit Sub
+    Else
+        ' projects name exists
+        For i = 1 To SelectedNumberOFProjects
+            txtName = "TextBoxProject" & i
+            If Me.Controls(txtName).Value = "" Then
+                MsgBox "One name of project is empty"
+                Exit Sub
+            End If
+        Next i
+    End If
+    
+    For i = 11 To 25
+        If InStr(1, CleanString(wsDVP.Cells(i, 8).Value), CleanString(ComboBoxDivision.Value)) <> 0 Then
+            DivisionSurname = wsDVP.Cells(i, 9).Value 'surname of the division to find the worksheets accordingly
+        End If
+    Next i
+    If DivisionSurname = "" Then
+        MsgBox "The Division surname could not be found in worksheet 'Developer'."
+        Exit Sub
+    End If
+    Set wsCertif = ThisWorkbook.Sheets("Employees certif " & DivisionSurname)
+    'certif worksheet according to division chosen
+    
+    Dim LastColumnProjectsLine As Long, LastColumnProjectsProject As Long, lastRowLine As Long, lastRowProject As Long, columntofillLine As Long, columntofillProject As Long
+    lastRowDVP = GetLastNonEmptyRow(wsDVP, 8) + 1
+    If lastRowDVP < 11 Then lastRowDVP = 11
+    Call FindColumnandRowForLineandProject(LastColumnProjectsLine, LastColumnProjectsProject, lastRowDVP, wsDVP, wsProjects, _
+        lastRowLine, lastRowProject, columntofillLine, columntofillProject)
+    ' Define columns and rows to fill
+    
+    With wsProjects
+        Dim l As Long
+        For i = 1 To ComboBoxNumber.Value
+            txtName = "TextBoxProject" & i ' project
+            txtName2 = "ComboBox" & i ' level required
+            For l = 11 To lastRowLine
+                If CleanString(.Cells(l, 9).Value) = CleanString(TextBoxLine.Value) Then ' production line name if already exists
+                    .Cells(l, columntofillLine).Value = "X" 'associate project, line and level to this division
+                ElseIf l = lastRowLine And CleanString(.Cells(l, 9).Value) <> CleanString(TextBoxLine.Value) Then
+                    lastRowLine = lastRowLine + 1 'if raw inserted -> last raw + 1
+                    .Cells(lastRowLine, 9).Value = TextBoxLine.Value 'add new line if does not exist
+                    .Cells(lastRowLine, columntofillLine).Value = "X" 'associate line and level to this division
+                End If
+            Next l
+            
+            For l = 11 To lastRowProject
+                If CleanString(.Cells(l, 30).Value) = CleanString(Me.Controls(txtName).Value) Then ' project name check
+                    .Cells(l, columntofillProject).Value = "X" 'associate project to this division
+                    If CleanString(.Cells(l, 31).Value) <> CleanString(Me.Controls(txtName2).Value) Then
+                        response = MsgBox("Do you want to change the old level required: " & .Cells(l, 31).Value & " with " & Me.Controls(txtName2).Value & "? ", vbYesNo + vbQuestion, "Crush old level required?")
+                        If response = vbYes Then
+                            .Cells(l, 31).Value = Me.Controls(txtName2).Value ' change level
+                        End If
+                    End If
+                ElseIf l = lastRowProject Then  'last raw and not same project
+                    lastRowProject = lastRowProject + 1 'if raw inserted -> last raw + 1
+                    .Cells(lastRowProject, 30).Value = Me.Controls(txtName).Value ' add project if does not exist
+                    .Cells(lastRowProject, 31).Value = Me.Controls(txtName2).Value ' add level
+                    .Cells(lastRowProject, columntofillProject).Value = "X" 'associate project and level to this division
+                End If
+            Next l
+        Next i
+    End With
+    Unload Me
+
+    Call UpdateProjectsList(wsCertif) ' update certif list of projects
+End Sub
+
+
+Sub FindColumnandRowForLineandProject(LastColumnProjectsLine As Long, LastColumnProjectsProject As Long, lastRowDVP As Long, wsDVP As Worksheet, wsProjects As Worksheet, _
+    lastRowLine As Long, lastRowProject As Long, columntofillLine As Long, columntofillProject As Long)
+   
+    Dim c As Long
+    With wsDVP
+        LastColumnProjectsLine = .Cells(lastRowDVP - 1, 11).Value 'last column not empty for lines in worksheet Projects
+        LastColumnProjectsProject = .Cells(lastRowDVP - 1, 12).Value 'last column not empty for projects in worksheet Projects
+    End With
+    lastRowLine = GetLastNonEmptyRow(wsProjects, 9) + 1
+    lastRowProject = GetLastNonEmptyRow(wsProjects, 30) + 1
+    If lastRowLine < 11 Or lastRowProject < 11 Then
+        MsgBox "The columns have been displaced in 'Projects' worksheet. Program cannot find last row for column 9 and 30, respectively list of production lines and projects."
+        Exit Sub
+    End If
+    With wsProjects
+        For c = 9 To LastColumnProjectsLine
+            If InStr(1, CleanString(.Cells(10, c).Value), CleanString(ComboBoxDivision.Value)) <> 0 Then
+                columntofillLine = c
+                Exit For
+            End If
+        Next c
+        For c = LastColumnProjectsLine + 1 To LastColumnProjectsProject
+            If InStr(1, CleanString(.Cells(10, c).Value), CleanString(ComboBoxDivision.Value)) <> 0 Then
+                columntofillProject = c
+                Exit For
+            End If
+        Next c
+    End With
+End Sub
+     
+
+
+
+

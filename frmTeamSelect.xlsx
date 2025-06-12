@@ -1,0 +1,26 @@
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim i As Long, k As Long
+    Dim wsDVP As Worksheet
+    frmTeamSelect.Width = 400
+    frmTeamSelect.Height = 300
+    ' Various declarations
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    For i = 11 To 15
+        For k = 1 To 10
+            AddItemWithoutDuplicates ComboBoxNumber, wsDVP.Cells(i, 20).Value
+        Next k
+    Next i
+End Sub
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    If ComboBoxNumber.Value <> "" Then
+        Dim TeamSelected As String
+        TeamSelected = ComboBoxNumber.Value
+        Call BackupSkillMatrix(TeamSelected)
+        Unload Me
+    End If
+End Sub
+

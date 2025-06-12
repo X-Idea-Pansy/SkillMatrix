@@ -1,0 +1,179 @@
+Private photoPath As String
+Option Explicit
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, selectedPosition As String, SelectedGlasses As String, _
+    SelectedProductionLine As String, SelectedPROJECT As String, selectedStartDate As String, Linkphoto As String, selectedDOJO As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsFind As Worksheet, wsProject As Worksheet
+    Dim lastRow As Long, columntoselect As Long, lastColumn As Long, selectedLEVEL As Long, selectedColor As Long, i As Long, k As Long
+    On Error GoTo InitError
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsProject = ThisWorkbook.Sheets("Projects")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    Set wsFind = ThisWorkbook.Sheets("Find an Employee")
+    ' Various declarations
+    frmAddCertif.Width = 600
+    frmAddCertif.Height = 600
+    Call GetDATAfromWS(wsFind, SELECTEDName, selectedPosition, selectedStartDate, selectedDOJO, SelectedGlasses, Linkphoto)
+    
+    ' Pre-fill form with current slot info
+    If SELECTEDName <> "" Then
+        lblName.Caption = SELECTEDName
+        TextBoxDate = Format(Now, "dd/mm/yyyy")
+        Call TestChangeValue(selectedPosition, selectedStartDate, selectedDOJO, SelectedGlasses)
+        Call TestLinkPhoto(Linkphoto)
+    End If
+
+    For i = 4 To 500
+        If i > 10 Then
+            If i < 15 Then ' Add levels(LVL) without doubles
+                AddItemWithoutDuplicates cmbLVL, wsDVP.Cells(i, 19).Value
+            End If
+            For k = 1 To 10
+                AddItemWithoutDuplicates ComboBoxDivision, wsDVP.Cells(i, 8).Value ' to choose the division
+            Next k
+            If wsProject.Cells(i, 9).Value <> "" Then ' Add prod lines without doubles
+                AddItemWithoutDuplicates cmbLine, wsProject.Cells(i, 9).Value
+            End If
+            If wsProject.Cells(i, 30).Value <> "" Then ' Add projects without doubles
+                AddItemWithoutDuplicates cmbProject, wsProject.Cells(i, 30).Value
+            End If
+        End If
+    Next i
+    Exit Sub
+InitError:
+    MsgBox "Error during initialization: " & Err.Description
+End Sub
+Sub TestChangeValue(selectedPosition As String, selectedStartDate As String, selectedDOJO As String, SelectedGlasses As String)
+    If selectedPosition <> "" Then lblPosition.Caption = selectedPosition
+    If selectedStartDate <> "" Then lblStartDate.Caption = selectedStartDate
+    If selectedDOJO <> "" Then lblDOJO.Caption = selectedDOJO
+    If SelectedGlasses <> "" Then lblGlasses.Caption = SelectedGlasses
+End Sub
+Sub TestLinkPhoto(Linkphoto As String)
+    If Linkphoto <> "" Then
+        If Dir(Linkphoto) <> "" Then
+            imgPhoto.Picture = LoadPicture(Linkphoto)
+        Else
+            imgPhoto.Picture = LoadPicture("") ' clears image
+            MsgBox "The photo is not available in the network, maybe rename the picture in the network and insure it is placed according to the link."
+        End If
+    End If
+End Sub
+Sub AddItemWithoutDuplicates(cmb As Object, item As String)
+    Dim itemExists As Boolean
+    Dim i As Long
+    ' Various declarations
+    
+    itemExists = False ' Check if exists
+    For i = 0 To cmb.ListCount - 1
+        If cmb.List(i) = item Then
+            itemExists = True
+            Exit For
+        End If
+    Next i
+    ' Add element if does not already exist
+    If Not itemExists And item <> "" Then
+        cmb.AddItem item
+    End If
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    Dim wsCertif As Worksheet, wsFind As Worksheet, wsDVP As Worksheet
+    Dim i As Long, ColumnToFill As Long, rawtofill As Long, lastColumn As Long, lastRow As Long
+    Dim cellCertif As String, DivisionSurname As String
+    Set wsFind = ThisWorkbook.Sheets("Find an Employee")
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    
+    ' Various declarations
+    On Error Resume Next
+    If lblName Is Nothing Then
+        MsgBox "Employee's name not defined."
+        Exit Sub
+    End If
+    On Error GoTo 0
+    If ComboBoxDivision.Value = "" Then
+        MsgBox "Please, select the division to which this employee is associated."
+        Exit Sub
+    End If
+    For i = 11 To 25
+        If InStr(1, CleanString(wsDVP.Cells(i, 8).Value), CleanString(ComboBoxDivision.Value)) <> 0 Then
+            DivisionSurname = wsDVP.Cells(i, 9).Value 'surname of the division to find the worksheets accordingly
+        End If
+    Next i
+    If DivisionSurname = "" Then
+        MsgBox "The Division surname could not be found in worksheet 'Developer'."
+        Exit Sub
+    End If
+    Set wsCertif = ThisWorkbook.Sheets("Employees certif " & DivisionSurname)
+    'certif worksheet according to division chosen
+    
+    If cmbLine <> "" And cmbProject <> "" And TextBoxDate <> "" Then
+        With wsCertif
+            lastColumn = GetLastNonEmptyColumn(wsCertif, 4)
+            If lastColumn < 10 Then lastColumn = 10
+            lastRow = GetLastNonEmptyRow(wsCertif, 2)
+            If lastRow < 5 Then lastRow = 5
+            
+            For i = 10 To lastColumn
+                cellCertif = .Cells(4, i)
+                If InStr(1, CleanString(cellCertif), CleanString(cmbLine)) <> 0 And InStr(1, CleanString(cellCertif), CleanString(cmbProject)) <> 0 And InStr(1, CleanString(cellCertif), CleanString(cmbLVL)) <> 0 Then
+                    ColumnToFill = i 'get the column with the certification to fill
+                End If
+            Next i
+            If ColumnToFill = 0 Then
+                MsgBox "The production line, project and level indicated were not found together in a certification column of the data base. " & _
+                        "Are you sure this project exists for this production line in the data base?" & vbCrLf & _
+                        "Please, check. Because it is not. :)"
+                Exit Sub
+                Unload Me
+            End If
+            
+            For i = 5 To lastRow
+                cellCertif = .Cells(i, 2)
+                If InStr(1, CleanString(cellCertif), CleanString(lblName)) <> 0 Then
+                    rawtofill = i 'get the raw for the employee getting the certification
+                End If
+            Next i
+            If rawtofill = 0 Then
+                MsgBox "The name of the employee was not found for the production line selected."
+                Exit Sub
+                Unload Me
+            End If
+            
+            If ColumnToFill <> 0 And rawtofill <> 0 Then
+                If Right(cmbLVL, 1) > 1 Then
+                    ' check if previous level certif was made
+                    If .Cells(rawtofill, ColumnToFill - 1).Value = "" Then
+                        MsgBox "You want to add the certification " & cmbLVL & vbCrLf & _
+                                "But " & Left(cmbLVL, 6) & Right(cmbLVL, 1) - 1 & " was not validated" & vbCrLf & _
+                                "The previous level of this certification has to be validated before passing to the next one."
+                        Exit Sub
+                    End If
+                End If
+                If .Cells(rawtofill, ColumnToFill).Value <> "" Then ' already has certification
+                    If MsgBox("This employee seems to already have the certification on line " & cmbLine & ", project " & _
+                    cmbProject & ", " & cmbLVL & vbCrLf & "Do you want to change the date " & _
+                    .Cells(rawtofill, ColumnToFill).Value & " with " & TextBoxDate.Value & "?", vbYesNo + vbQuestion, "Confirmation") = vbNo Then
+                        Exit Sub ' go back to filling the userform
+                    End If
+                End If
+                .Cells(rawtofill, ColumnToFill).Value = TextBoxDate.Value 'add value
+            Else
+                MsgBox "Couldn't find the target cell.", vbExclamation
+                Exit Sub
+            End If
+        End With
+        Unload Me
+    Else
+        MsgBox "You have to fill up the form to add a certification to this employee."
+        Exit Sub
+    End If
+End Sub
+
+
+

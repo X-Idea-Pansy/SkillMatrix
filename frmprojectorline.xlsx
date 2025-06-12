@@ -1,0 +1,18 @@
+Option Explicit
+Private Sub CommandButtonAddProductionLine_Click()
+    Unload Me
+    frmAddProductionLine.Show 'add production line and projects to existing division
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+
+Private Sub CommandButtonDivision_Click()
+    Unload Me
+    frmAddDivision.Show
+End Sub
+
+Private Sub UserForm_Click()
+
+End Sub

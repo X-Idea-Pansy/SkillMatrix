@@ -1,0 +1,144 @@
+Option Explicit
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim i As Long, k As Long
+    Dim wsDVP As Worksheet
+    Dim txtName2 As String
+    frmAddDivision.Width = 800
+    frmAddDivision.Height = 500
+    ' Various declarations
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    For i = 1 To 15
+        If i < 11 Then ComboBoxNumber.AddItem i
+        If i > 10 And i < 15 Then ' Add levels (LVL) without doubles
+            For k = 1 To 10
+                txtName2 = "ComboBox" & k
+                AddItemWithoutDuplicates Me.Controls(txtName2), wsDVP.Cells(i, 19).Value
+            Next k
+        End If
+    Next i
+End Sub
+
+Private Sub ComboBoxNumber_Change()
+    Dim i As Long
+    Dim selectedNumber As Long
+    Dim txtName As String, txtName2 As String, lblName As String, txtName3 As String
+    ' Various declarations
+    selectedNumber = CInt(ComboBoxNumber.Value)
+
+    For i = 1 To 10 ' Adjust this to your actual number of TextBoxProject controls
+        txtName = "TextBoxProject" & i
+        lblName = "lblProject" & i
+        txtName2 = "ComboBox" & i
+        txtName3 = "TextBoxLine" & i
+        
+        If Me.Controls(txtName) Is Nothing Or Me.Controls(lblName) Is Nothing Or Me.Controls(txtName2) Is Nothing Then
+            ' Skip if the control doesn't exist
+        Else
+            Me.Controls(txtName).Visible = (i <= selectedNumber)
+            Me.Controls(lblName).Visible = (i <= selectedNumber)
+            Me.Controls(txtName2).Visible = (i <= selectedNumber)
+            Me.Controls(txtName3).Visible = (i <= selectedNumber)
+        End If
+    Next i
+    ThisWorkbook.Names.Add Name:="SelectedNumberOFProjects", RefersTo:="=""" & selectedNumber & """"
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+    Dim SelectedNumberOFProjects As Long, i As Long, lastColumn As Long, lastRowDVP As Long, lastRow As Long
+    Dim wsProjects As Worksheet, wsDVP As Worksheet
+    Set wsProjects = ThisWorkbook.Sheets("Projects")
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Dim txtName As String, txtName2 As String, txtName3 As String, DivisionSurname As String
+    Dim tempVal As Variant
+    ' Various declarations
+    On Error Resume Next
+    SelectedNumberOFProjects = CInt(Evaluate("SelectedNumberOFProjects"))
+    On Error GoTo 0
+    tempVal = Evaluate("SelectedNumberOFProjects")
+    
+    If IsNumeric(tempVal) Then
+        SelectedNumberOFProjects = CInt(tempVal)
+    Else
+        MsgBox "Invalid number of projects selected."
+        Exit Sub
+    End If
+    DivisionSurname = TextBoxDivisionSurname.Value 'surname of the division to create the worksheets accordingly
+    If DivisionSurname = "" Then
+        MsgBox "Please, indicate a division surname."
+        Exit Sub
+    End If
+    
+    If TextBoxNewDivision.Value = "" Then 'name for new line
+        MsgBox "You have to give a name to the new division"
+        Exit Sub
+    ElseIf ComboBoxNumber.Value = "" Then ' number of projects
+        MsgBox "You have to select a number of projects"
+        Exit Sub
+    Else ' projects name exists
+        For i = 1 To SelectedNumberOFProjects
+            txtName = "TextBoxProject" & i
+            txtName3 = "TextBoxLine" & i
+            If Me.Controls(txtName).Value = "" Then
+                MsgBox "One name of project is empty"
+            ElseIf Me.Controls(txtName3).Value = "" Then
+                MsgBox "One name of production line is empty"
+                Exit Sub
+            End If
+        Next i
+    End If
+    
+    Dim LastColumnProjectsLine As Long, LastColumnProjectsProject As Long, lastRowLine As Long, lastRowProject As Long, columntofillLine As Long, columntofillProject As Long
+    lastRowDVP = GetLastNonEmptyRow(wsDVP, 8) + 1
+    If lastRowDVP < 11 Then lastRowDVP = 11
+    wsDVP.Cells(lastRowDVP, 8).Value = TextBoxNewDivision.Value
+    Call FindLastColumnandRowForLineandProject(LastColumnProjectsLine, LastColumnProjectsProject, lastRowDVP, wsDVP, wsProjects, _
+        lastRowLine, lastRowProject, columntofillLine, columntofillProject)
+    ' Define columns and rows to fill
+    
+    With wsProjects
+        Columns(LastColumnProjectsLine + 1).Hidden = False
+        .Cells(10, LastColumnProjectsLine + 1).Value = TextBoxNewDivision.Value
+        Columns(LastColumnProjectsProject + 1).Hidden = False
+        .Cells(10, LastColumnProjectsProject + 1).Value = TextBoxNewDivision.Value
+        ' Add new division to Projects worksheet
+        
+        For i = 1 To ComboBoxNumber.Value
+            txtName = "TextBoxProject" & i ' project
+            txtName2 = "ComboBox" & i ' level required
+            txtName3 = "TextBoxLine" & i ' line of production
+            .Cells(lastRowLine, 9).Value = Me.Controls(txtName3).Value 'add name of new production line?
+            .Cells(lastRowLine, LastColumnProjectsLine).Value = "X" 'select it in DATA base of project
+            lastRowLine = lastRowLine + 1
+            .Cells(lastRowProject, 10).Value = Me.Controls(txtName).Value 'add name of new project?
+            If Me.Controls(txtName2).Value <> "" Then .Cells(lastRowProject, 31).Value = Me.Controls(txtName2).Value
+            .Cells(lastRowProject, LastColumnProjectsProject).Value = "X" 'select it in DATA base of project
+            lastRowProject = lastRowProject + 1
+        Next i
+    End With
+    
+    Call DupliquerFeuilleEtRenommer(DivisionSurname, "Skill Matrix ", 9) 'new division Op visual
+    Call DupliquerFeuilleEtRenommer(DivisionSurname, "Employees certif ", 7) 'certif worksheet according to division chosen
+    Unload Me
+End Sub
+Sub FindLastColumnandRowForLineandProject(LastColumnProjectsLine As Long, LastColumnProjectsProject As Long, lastRowDVP As Long, wsDVP As Worksheet, wsProjects As Worksheet, _
+    lastRowLine As Long, lastRowProject As Long, columntofillLine As Long, columntofillProject As Long)
+    Dim c As Long
+    With wsDVP
+        LastColumnProjectsLine = .Cells(lastRowDVP - 1, 11).Value 'last column not empty for lines in worksheet Projects
+        LastColumnProjectsProject = .Cells(lastRowDVP - 1, 12).Value 'last column not empty for projects in worksheet Projects
+    End With
+    lastRowLine = GetLastNonEmptyRow(wsProjects, 9) + 1
+    lastRowProject = GetLastNonEmptyRow(wsProjects, 30) + 1
+    If lastRowLine < 11 Or lastRowProject < 11 Then
+        MsgBox "The columns have been displaced in 'Projects' worksheet. Program cannot find last row for column 9 and 30, respectively list of production lines and projects."
+        Exit Sub
+    End If
+End Sub
+
+
+

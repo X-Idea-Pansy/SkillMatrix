@@ -1,0 +1,180 @@
+Private photoPath As String
+Option Explicit
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, SelectedProductionLine As String, SelectedPROJECT As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet
+    Dim lastRow As Long, columntoselect As Long, lastColumn As Long, selectedLEVEL As Long, selectedColor As Long, i As Long
+    ' Various declarations
+    frmModifyEmployee.Width = 580
+    frmModifyEmployee.Height = 580
+
+    On Error GoTo InitError
+    Dim n As Name
+    For Each n In ThisWorkbook.Names
+        Debug.Print n.Name, n.RefersTo
+    Next n
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+    End With
+    For i = 5 To lastRow
+        If Not wsEmployeeData.Rows(i).Hidden Then ' Only include visible rows
+            cmbEmployees.AddItem wsEmployeeData.Cells(i, 2).Value
+        End If
+    Next i
+    For i = 11 To 25
+        If i > 10 Then
+            AddItemWithoutDuplicates ComboBoxDivision, wsDVP.Cells(i, 8).Value ' to choose the division
+            AddItemWithoutDuplicates ComboBoxStatus, wsDVP.Cells(i, 14).Value ' to choose the status
+        End If
+    Next i
+    Exit Sub
+InitError:
+    MsgBox "Error during initialization: " & Err.Description
+End Sub
+
+Private Sub cmbEmployees_Change()
+Rem: Actions to update the userform if there is a change in it
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim SELECTEDName As String, fileName As String, Linkphoto As String
+    ' Various declarations
+    SELECTEDName = cmbEmployees.Value
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+
+        For i = 5 To lastRow
+            If CleanString(.Cells(i, 2).Value) = CleanString(SELECTEDName) Then
+                Linkphoto = .Cells(i, 7).Value  ' Set photo
+                If Dir(Linkphoto) <> "" Then
+                    imgPhoto.Picture = LoadPicture(Linkphoto)
+                Else
+                    imgPhoto.Picture = LoadPicture("") ' clears image
+                    MsgBox "Verify the picture link of this employee."
+                End If
+                TextBoxID = .Cells(i, 3).Value
+                TextBoxName = .Cells(i, 2).Value
+                TextBoxDate = .Cells(i, 5).Value
+                
+                If CleanString(.Cells(i, 8).Value) = "OK" Then 'DOJO
+                    OptionButton4.Value = True
+                Else
+                    OptionButton5.Value = True
+                End If
+                
+                If CleanString(.Cells(i, 9).Value) = "YES" Then 'Glasses
+                    OptionButton6.Value = True
+                Else
+                    OptionButton7.Value = True
+                End If
+                
+                If CleanString(.Cells(i, 4).Value) = "OP" Then 'Position
+                    OptionButton8.Value = True
+                ElseIf CleanString(.Cells(i, 4).Value) = "BT" Then
+                    OptionButton9.Value = True
+                ElseIf CleanString(.Cells(i, 4).Value) = "LL" Then
+                    OptionButton10.Value = True
+                ElseIf CleanString(.Cells(i, 4).Value) = "GL" Then
+                    OptionButton11.Value = True
+                ElseIf CleanString(.Cells(i, 4).Value) = "MOP" Then
+                    OptionButton12.Value = True
+                Else
+                    OptionButton13.Value = True
+                End If
+                
+                TextBoxComments = .Cells(i, 12).Value
+                Exit For
+            End If
+        Next i
+    End With
+End Sub
+
+Private Sub cmdExit_Click()
+Rem: Exit
+    Unload Me
+End Sub
+Private Sub cmdValidate_Click()
+Rem: Actions to update the Employee's data
+    Dim SELECTEDName As String, DOJO As String, Glasses As String, Position As String, DivisionSurname As String
+    Dim wsEmployeeData As Worksheet, wsCertif As Worksheet, wsDVP As Worksheet
+    Dim i As Long, lastRow As Long
+    SELECTEDName = cmbEmployees.Value
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    ' Various declarations
+    If ComboBoxDivision.Value = "" Then
+        MsgBox "Please, select the division to which this employee is associated.", vbExclamation
+        Exit Sub
+    End If
+    If ComboBoxStatus.Value = "" Then
+        MsgBox "Please, select the status to which this employee is associated.", vbExclamation
+        Exit Sub
+    End If
+    For i = 11 To 25
+        If InStr(1, CleanString(wsDVP.Cells(i, 8).Value), CleanString(ComboBoxDivision.Value)) <> 0 Then
+            DivisionSurname = wsDVP.Cells(i, 9).Value 'surname of the division to find the worksheets accordingly
+        End If
+    Next i
+    If DivisionSurname = "" Then
+        MsgBox "The Division surname could not be found in worksheet 'Developer'."
+        Exit Sub
+    End If
+    Set wsCertif = ThisWorkbook.Sheets("Employees certif " & DivisionSurname)
+    'certif worksheet according to division chosen
+    
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+        
+        For i = 5 To lastRow
+            If CleanString(.Cells(i, 2).Value) = CleanString(SELECTEDName) Then
+                .Cells(i, 3).Value = TextBoxID.Value
+                .Cells(i, 2).Value = TextBoxName.Value
+                .Cells(i, 5).Value = TextBoxDate.Value
+                .Cells(i, 13).Value = ComboBoxStatus.Value
+                If OptionButton4.Value = True Then 'DOJO
+                    .Cells(i, 8).Value = "OK"
+                Else
+                    .Cells(i, 8).Value = "NOK"
+                End If
+                DOJO = .Cells(i, 8).Value
+                If OptionButton6.Value = True Then 'Glasses
+                    .Cells(i, 9).Value = "YES"
+                Else
+                    .Cells(i, 9).Value = "NO"
+                End If
+                Glasses = .Cells(i, 9).Value
+                
+                If OptionButton8.Value = True Then 'Position
+                    .Cells(i, 4).Value = "OP"
+                ElseIf OptionButton9.Value = True Then
+                    .Cells(i, 4).Value = "BT"
+                ElseIf OptionButton10.Value = True Then
+                    .Cells(i, 4).Value = "LL"
+                ElseIf OptionButton11.Value = True Then
+                    .Cells(i, 4).Value = "GL"
+                ElseIf OptionButton12.Value = True Then
+                    .Cells(i, 4).Value = "MOP"
+                ElseIf OptionButton13.Value = True Then
+                    .Cells(i, 4).Value = "Other"
+                End If
+                Position = .Cells(i, 4).Value
+                
+                .Cells(i, 12).Value = TextBoxComments
+                '''
+                Unload Me
+                Exit Sub
+            End If
+        Next i
+        End With
+    MsgBox "The name was not found in the list, which should not be possible since you select a name in this list."
+End Sub
+
+

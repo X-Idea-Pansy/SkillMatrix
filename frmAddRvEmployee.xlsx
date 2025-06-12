@@ -1,0 +1,18 @@
+Option Explicit
+Private Sub CommandButtonRemoveEmployee_Click()
+    Unload Me
+    frmRemoveEmployee.Show
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+
+Private Sub CommandButtonAddEmployee_Click()
+    Unload Me
+    frmAddEmployee.Show
+End Sub
+
+Private Sub UserForm_Click()
+
+End Sub

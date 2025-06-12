@@ -1,0 +1,699 @@
+
+Option Explicit
+Function GetInfoShift(Shift As String) As Long
+Rem: To take the offset into account in Skill Matrix
+    If InStr(1, Shift, "B") <> 0 Then
+        GetInfoShift = 0
+    ElseIf InStr(1, Shift, "Y") <> 0 Then
+        GetInfoShift = 1
+    ElseIf InStr(1, Shift, "G") <> 0 Then
+        GetInfoShift = 2
+    Else
+        MsgBox "The shift is not written."
+    End If
+End Function
+Sub DeleteColumnsAfterI()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Employees certif xxxx") ' Change to your actual sheet name
+
+    ' Delete all columns from J to the last column (XFD)
+    ws.Range("J:XFD").EntireColumn.Delete
+End Sub
+
+Function CleanString(ByVal str As String) As String
+    Rem: Clean caracters string: no spaces, jumps of lines, etc.
+    Dim accents As String
+    Dim sansAccents As String
+    Dim i As Integer
+    ' Substitution caracteres (min et maj too)
+    accents = "áèïéìíòóøšúùýžäâaaaeëeiîiôöooüuuçn" & _
+              "ÁÈÏÉÌÍÒÓØŠÚÙÝŽÄÂAAAEËEIÎIÔÖOOÜUUÇN"
+    sansAccents = "ACDEEINORSTUUYZAAAAEEEIIIOOOOUUUCN" & _
+                  "ACDEEINORSTUUYZAAAAEEEIIIOOOOUUUCN"
+    For i = 1 To Len(accents)
+        str = Replace(str, Mid(accents, i, 1), Mid(sansAccents, i, 1))
+    Next i
+    CleanString = str
+    
+    str = Trim(str) ' Delete spaces begining and end
+    str = Replace(str, Chr(160), "") ' Delete spaces
+    str = Replace(str, Chr(9), "") ' Delete tabulations
+    str = Replace(str, vbCrLf, "") ' Delete jumps
+    str = Replace(str, vbCr, "") ' Delete jumps
+    str = Replace(str, vbLf, "") 'Delete jumped lines
+    str = Replace(str, " ", "") ' Delete spaces
+    str = UCase(str) ' MAJ
+End Function
+Sub GetDATAfromWS(ws As Worksheet, SELECTEDName As String, selectedPosition As String, selectedStartDate As String, selectedDOJO As String, SelectedGlasses As String, Linkphoto As String)
+    Dim wsDVP As Worksheet, wsEmployeeData As Worksheet, wsFind As Worksheet, wsProject As Worksheet
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    Set wsFind = ThisWorkbook.Sheets("Find an Employee")
+    ' Various declarations
+    With ws
+        On Error Resume Next
+        If ws = wsFind Then
+            SELECTEDName = .Cells(9, 2)
+            selectedPosition = .Cells(9, 4)
+            selectedStartDate = .Cells(9, 5)
+            selectedDOJO = .Cells(9, 8)
+            SelectedGlasses = .Cells(9, 9)
+            Linkphoto = .Cells(9, 7)
+        End If
+        On Error GoTo 0
+    End With
+End Sub
+Function GetElement(ListeLignes As String, Index As Long, élémentséparateur As String)
+    Rem: Get n element of a string separated by élémentséparateur
+    Dim startPos As Long, endPos As Long, currentIndex As Long, i As Long
+    ' Various declarations
+    startPos = 1
+    currentIndex = 1
+    For i = 1 To Len(ListeLignes)
+        endPos = InStr(startPos, ListeLignes, élémentséparateur)
+        If endPos > 0 Then
+            If currentIndex = Index Then ' if good index, get element
+                If TypeName(ListeLignes) = "Long" Then
+                    GetElement = CInt(Mid(ListeLignes, startPos, endPos - startPos))
+                Else
+                    GetElement = CStr(Mid(ListeLignes, startPos, endPos - startPos))
+                End If
+                Exit Function
+            End If
+            startPos = endPos + 1
+            currentIndex = currentIndex + 1
+        Else
+            If currentIndex = Index Then
+                If TypeName(ListeLignes) = "Long" Then
+                    GetElement = CInt(Mid(ListeLignes, startPos))
+                Else
+                    GetElement = CStr(Mid(ListeLignes, startPos))
+                End If
+                Exit Function
+            End If
+            Exit For
+        End If
+    Next i
+End Function
+
+Function RemoveElement(ByVal ListeLignes As String, Index As Long, élémentséparateur As String) As String
+    Dim éléments() As String
+    Dim i As Long
+    Dim result As String
+    
+    ' Divide string in board
+    éléments = Split(ListeLignes, élémentséparateur)
+    
+    ' Check if index valid
+    If Index < 1 Or Index > UBound(éléments) + 1 Then
+        RemoveElement = ListeLignes
+        Exit Function
+    End If
+    
+    ' Build new chain without element at index
+    For i = LBound(éléments) To UBound(éléments)
+        If (i + 1) <> Index Then ' +1 since Index is 1-based
+            If result = "" Then
+                result = éléments(i)
+            Else
+                result = result & élémentséparateur & éléments(i)
+            End If
+        End If
+    Next i
+    
+    RemoveElement = result
+End Function
+Function GetLastElement(ListeLignes As String, élémentséparateur As String) As String
+    Dim éléments() As String
+    éléments = Split(ListeLignes, élémentséparateur)
+    GetLastElement = éléments(UBound(éléments))
+End Function
+Sub CallUpdateProjectLists()
+    Call RefreshProjects
+    Dim wsDVP As Worksheet, wsCertif As Worksheet, ws As Worksheet
+    Dim confirmation As VbMsgBoxResult
+
+    Set wsCertif = ActiveSheet
+    ' Various declarations
+        If InStr(1, CleanString(wsCertif.Name), CleanString("Employees certif")) <> 0 Then
+            Call UpdateProjectsList(wsCertif) 'update this certification worksheet
+        End If
+End Sub
+Function GetColumnDiv(ws As Worksheet, DivSurname As String, firstCol As Long, lastCol As Long) As Long
+    Dim i As Long
+    For i = firstCol To lastCol
+        If InStr(1, CleanString(ws.Cells(10, i).Value), CleanString(DivSurname)) <> 0 Then
+            GetColumnDiv = i 'get column where data is stored in cross per production line or project for this division
+        End If
+    Next i
+End Function
+Function GetSourceColumn(ws As Worksheet, wsDVP As Worksheet) As Long
+    Dim i As Long
+    With ws 'GetElement(ListeLignes As String, Index As Long, élémentséparateur As String)
+        For i = 11 To 25
+            If InStr(1, CleanString(GetElement(.Name, 3, " ")), CleanString(wsDVP.Cells(i, 9).Value)) <> 0 Or InStr(1, CleanString(wsDVP.Cells(i, 9).Value), CleanString(GetElement(.Name, 3, " "))) <> 0 Then
+                GetSourceColumn = wsDVP.Cells(i, 10).Value 'column with division and line and project and levels possible for this division
+                Exit For
+            End If
+        Next i
+    End With
+End Function
+
+Sub UpdateProjectsList(ws As Worksheet)
+Rem: Updates worksheet ws certif with the informations in Projects worksheet
+    Call DésactiverEvents
+    Dim SourceColumn As Long, i As Long, k As Long, destinationcolumn As Long, destinationraw As Long, sourceRaw As Long, lastRow As Long, _
+    lastColDest As Long, ColumnDATAProj As Long, lastColumn As Long, ColumnToFill As Long, certValue As String, lastRowProj As Long, NbProdProj As Long
+    Dim wsDVP As Worksheet, wsProdLines As Worksheet, wsProjects As Worksheet
+    Dim dataSrc As Variant, dataDest As Variant
+    Dim DivSurname As String, ProjectToCheck As String
+    Dim dictProjets As Object
+    Dim tbl As ListObject
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsProdLines = ThisWorkbook.Sheets("ProductionLines")
+    Set wsProjects = ThisWorkbook.Sheets("Projects")
+    If wsDVP.ListObjects.Count = 0 Then
+        MsgBox "Table7 cannot be found in worsheet Developer", vbCritical
+        Exit Sub
+    End If
+    Set tbl = wsDVP.ListObjects("Table7") ' Assumes the table is named "Table7"
+    destinationcolumn = 10: destinationraw = 4
+    sourceRaw = 2
+    ' Various declarations
+    DivSurname = GetLastElement(ws.Name, " ")
+    lastColumn = GetLastNonEmptyColumn(wsProjects, 10)
+    If lastColumn < 32 Then lastColumn = 32
+    ColumnDATAProj = GetColumnDiv(wsProjects, DivSurname, 30, lastColumn) 'get column where data is stored in cross per project for this division
+    
+    lastRowProj = GetLastNonEmptyRow(wsProjects, 30)
+    NbProdProj = CountCross(wsProjects, 11, lastRowProj, ColumnDATAProj) 'New number of production lines in wsProjects ' column depends on Division !!!!
+    
+    ColumnToFill = 10
+    
+    For i = 11 To lastRowProj
+        lastColumn = GetLastNonEmptyColumn(wsProjects, 10)
+        ProjectToCheck = wsProjects.Cells(i, 30).Value
+        If InStr(1, wsProjects.Cells(i, ColumnDATAProj).Value, "X") <> 0 Then
+        
+            ' Check if project already exists in the destination sheet (ws)
+            For k = 10 To lastColumn
+                If InStr(1, wsDVP.Cells(4, k).Value, ProjectToCheck) <> 0 Then 'check with level !!!! or not ?
+                    'Project already exist
+                    GoTo NextProject
+                End If
+            Next k
+            
+            ' Add certifications for this project
+            For k = 10 To 13
+                certValue = GetValueFromTable(tbl, k, "Certification LEVEL")
+                'table7 header "Certification LEVEL", get value in table7 for row k and header found
+                If certValue <> "" Then
+                    ws.Cells(4, ColumnToFill).Value = ProjectToCheck & "-" & certValue
+                    ColumnToFill = ColumnToFill + 1
+                End If
+            Next k
+        End If
+NextProject:
+    Next i
+    
+    Call SetColumnWidthFromJToLastUsed(ws)
+    Call AdaptFormCells(ws)
+    Call ActiverEvents
+End Sub
+
+Function GetValueFromTable(tbl As ListObject, rowIndex As Long, headerName As String) As String
+    Dim col As ListColumn
+    On Error Resume Next
+    Set col = tbl.ListColumns(headerName)
+    If Not col Is Nothing Then
+        GetValueFromTable = col.DataBodyRange.Cells(rowIndex - tbl.Range.Row + 1, 1).Value
+    Else
+        GetValueFromTable = ""
+    End If
+    On Error GoTo 0
+End Function
+
+Function TesterValeursLigne(ByVal ligne As Long, ByVal colDebut As String, ByVal colFin As String, ByVal donneeRecherchee As Variant) As Boolean
+    Dim ws As Worksheet
+    Dim colStart As Long, colEnd As Long
+    Dim i As Long
+
+    ' Worksheet active
+    Set ws = ActiveSheet
+
+    ' Loop on cells between colDebut and colFin
+    For i = colDebut To colFin
+        If CleanString(ws.Cells(ligne, i).Value) = CleanString(donneeRecherchee) Then
+            TesterValeursLigne = True
+            Exit Function
+        End If
+    Next i
+
+    ' if no correspondance
+    TesterValeursLigne = False
+End Function
+
+Function DerniereLigneNonVideTableParColonne(NomTable As String, ColIndex As Long) As Long
+    Dim tbl As ListObject
+    Dim ws As Worksheet
+    Dim i As Long
+
+    On Error GoTo Erreur
+    
+    ' Look for table
+    For Each ws In ThisWorkbook.Worksheets
+        On Error Resume Next
+        Set tbl = ws.ListObjects(NomTable)
+        On Error GoTo 0
+        If Not tbl Is Nothing Then Exit For
+    Next ws
+
+    If tbl Is Nothing Then
+        DerniereLigneNonVideTableParColonne = -1
+        Exit Function
+    End If
+
+    ' Check if column number is valid
+    If ColIndex < 1 Or ColIndex > tbl.ListColumns.Count Then
+        DerniereLigneNonVideTableParColonne = -1
+        Exit Function
+    End If
+
+    With tbl.ListColumns(ColIndex).DataBodyRange
+        For i = .Rows.Count To 1 Step -1
+            If Trim(.Cells(i, 1).Value) <> "" Then
+                DerniereLigneNonVideTableParColonne = .Cells(i, 1).Row
+                Exit Function
+            End If
+        Next i
+    End With
+
+    DerniereLigneNonVideTableParColonne = -1
+    Exit Function
+
+Erreur:
+    DerniereLigneNonVideTableParColonne = -1
+End Function
+Function RemoveNthSubstring(ByVal inputStr As String, ByVal Target As String, ByVal n As Long) As String
+    Dim pos As Long, i As Long, startPos As Long
+    
+    pos = 1
+    For i = 1 To n
+        startPos = InStr(pos, inputStr, Target, vbTextCompare)
+        If startPos = 0 Then
+            RemoveNthSubstring = inputStr ' Target not found n times
+            Exit Function
+        End If
+        pos = startPos + Len(Target)
+    Next i
+
+    ' Remove the nth occurrence
+    RemoveNthSubstring = Left(inputStr, startPos - 1) & Mid(inputStr, startPos + Len(Target))
+End Function
+
+Sub SetColumnWidthFromJToLastUsed(ws As Worksheet)
+    Dim lastCol As Long, c As Long
+    Dim rng As Range
+    ' Find the last used column in the worksheet
+    lastCol = GetLastNonEmptyColumn(ws, 4)
+                            
+    ' Only adjust if last column is after or equal to column J (column 10)
+    If lastCol >= 10 Then
+        Set rng = ws.Range(ws.Cells(4, 10), ws.Cells(4, lastCol)) ' Row 4, columns J to last used
+        With rng
+            .ColumnWidth = 0.88
+            .Orientation = 90 ' Sets text orientation top-to-bottom
+            .VerticalAlignment = xlTop
+            .HorizontalAlignment = xlCenter
+        End With
+    End If
+End Sub
+Sub AdaptFormCells(ws As Worksheet)
+    Dim lastCol As Long, c As Long, lastRow As Long
+    Dim rng As Range
+    ' Find the last used column in the worksheet
+    lastCol = GetLastNonEmptyColumn(ws, 4)
+    lastRow = GetLastNonEmptyRow(ws, 4)
+    ' Only adjust if last column is after or equal to column J (column 10)
+    If lastCol >= 10 And lastRow >= 5 Then
+        Set rng = ws.Range(ws.Cells(5, 10), ws.Cells(lastRow, lastCol)) ' J5 to last used
+        With rng
+            .Orientation = 90 ' Sets text orientation top-to-bottom
+            .VerticalAlignment = xlCenter
+            .HorizontalAlignment = xlCenter
+            .Font.Size = 5 ' Set font size to 5
+        End With
+    End If
+End Sub
+Function GetLastNonEmptyColumn(ws As Worksheet, targetRow As Long) As Long
+Rem: Get last non empty cell or targetRow
+    Dim lastCol As Long
+    With ws
+        lastCol = .Cells(targetRow, .Columns.Count).End(xlToLeft).Column
+        If IsEmpty(.Cells(targetRow, lastCol).Value) Then
+            GetLastNonEmptyColumn = 0 ' No non-empty cells in the row
+        Else
+            GetLastNonEmptyColumn = lastCol
+        End If
+    End With
+End Function
+Function GetLastNonEmptyRow(ws As Worksheet, targetColumn As Long) As Long
+Rem: Get last non empty cell in targetColumn
+    Dim lastRow As Long
+    With ws
+        lastRow = .Cells(.Rows.Count, targetColumn).End(xlUp).Row
+        If IsEmpty(.Cells(lastRow, targetColumn).Value) Then
+            GetLastNonEmptyRow = 0 ' No non-empty cells in the column
+        Else
+            GetLastNonEmptyRow = lastRow
+        End If
+    End With
+End Function
+
+Sub DupliquerFeuilleEtRenommer(namenewDivision As String, Title As String, sheetTOcopy As Long)
+    Dim feuilleSource As Worksheet
+    Dim feuilleCopie As Worksheet
+    ' Various declarations
+    
+    Set feuilleSource = ThisWorkbook.Worksheets(sheetTOcopy)
+    namenewDivision = Title & namenewDivision ' new name
+
+    On Error Resume Next
+    Set feuilleCopie = ThisWorkbook.Worksheets(namenewDivision)
+    On Error GoTo 0
+    
+    If feuilleCopie Is Nothing Then
+        feuilleSource.Copy After:=feuilleSource ' Duplicate
+        Set feuilleCopie = ActiveSheet
+        feuilleCopie.Name = namenewDivision
+    Else
+        MsgBox "This worksheet name / division " & namenewDivision & " is already used.", vbExclamation
+    End If
+End Sub
+
+Sub AddItemWithoutDuplicates(cmb As Object, item As String)
+    Dim itemExists As Boolean
+    Dim i As Long
+    ' Various declarations
+    ' Check if already exists
+    itemExists = False
+    For i = 0 To cmb.ListCount - 1
+        If cmb.List(i) = item Then
+            itemExists = True
+            Exit For
+        End If
+    Next i
+    ' Add element if does not already exist
+    If Not itemExists And item <> "" Then
+        cmb.AddItem item
+    End If
+End Sub
+Sub UpdateWSCertifNames(ws As Worksheet, Name As String, ID As String)
+    Dim lastRowCertif As Long
+    With ws
+        lastRowCertif = GetLastNonEmptyRow(ws, 2) + 1
+        If lastRowCertif < 5 Then lastRowCertif = 5
+        .Cells(lastRowCertif, 2).Value = Name
+        .Cells(lastRowCertif, 3).Value = ID
+        ' Rest is done by formulas
+    End With
+End Sub
+
+Sub CacherImage(ws As Worksheet, plage As Range, imageURL As String, posX As Double, posY As Double, imgWidth As Double, imgHeight As Double)
+    Rem: Delete picture in a range f cells for wanted ws
+    Dim image As Shape
+    Dim imagePicture As Picture
+    Dim minDistance As Long, Distance As Long
+    Dim closestCell As Range, cell As Range
+    ' Various declarations
+    On Error Resume Next ' Ignore potential mistakes
+    For Each image In ws.Shapes
+        minDistance = 100
+        Set closestCell = Nothing
+        For Each cell In plage
+            Distance = Abs(image.Left - cell.Left) + Abs(image.Top - cell.Top)
+            If Distance < minDistance Then
+                minDistance = Distance
+                Set closestCell = cell
+            End If
+        Next cell
+        If Not closestCell Is Nothing Then
+            If Not Intersect(closestCell, plage) Is Nothing Then
+                image.Delete
+            End If
+        End If
+    Next image
+    Call ActiverEvents
+End Sub
+
+
+Sub AfficherImage(ws As Worksheet, plage As Range, imageURL As String, posX As Double, posY As Double, imgWidth As Double, imgHeight As Double)
+    Rem: change picture in a range of cells in a worksheet
+    Dim image As Shape
+    Dim imagePicture As Picture
+    Dim minDistance As Long, Distance As Long
+    Dim closestCell As Range, cell As Range
+    ' Various declarations
+    On Error Resume Next
+    Call CacherImage(ws, plage, imageURL, posX, posY, imgWidth, imgHeight)
+    'Call DésactiverEvents
+    On Error GoTo ErreurInsertion
+    Set imagePicture = ws.Pictures.Insert(imageURL)
+    With imagePicture ' Adjust
+        .Height = imgHeight
+        '.Width = imgWidth
+        .Name = "InsertedImage" ' Unique name for futur management
+        .Left = posX
+        .Top = posY
+    End With
+    ' Réactiver alertes et événements
+    Call ActiverEvents
+    Exit Sub
+    
+ErreurInsertion:
+    ' Réactiver alertes et événements
+    Call ActiverEvents
+    Debug.Print "Impossible to show picture. Check link URL " & imageURL & " or network connection.", vbCritical
+End Sub
+Sub BackupCertif()
+    Dim wsDVP As Worksheet, wsCertif As Worksheet
+    Dim lastRow As Long, fileNum As Long, i As Long, j As Long, lastCol As Long
+    Dim fileName As String, backupPath As String, rowData As String, DivSurname As String
+    Dim rng As Range
+    Dim cell As Range
+    Dim selectedCols As Variant
+    Dim colVal As String
+
+    ' Set your worksheet
+    Set wsCertif = ActiveSheet
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+
+    ' Find last row with data in column B
+    lastRow = GetLastNonEmptyRow(wsCertif, 2)
+    lastCol = GetLastNonEmptyColumn(wsCertif, 4)
+
+    ' Build the file path
+    DivSurname = GetLastElement(wsCertif.Name, " ")
+    backupPath = wsDVP.Cells(11, 4).Value & "Backups Certif Skill Matrix\"
+    fileName = Format(Now, "yyyy-mm-dd_hh-nn-ss") & " - Division " & DivSurname & " - Certif DATES.txt"
+    
+    ' Create the text file
+    fileNum = FreeFile
+    Open backupPath & fileName For Output As #fileNum
+    
+    ' Write header with slashes
+    rowData = ""
+    For j = 2 To lastCol
+        rowData = rowData & wsCertif.Cells(4, j).Value & "/"
+    Next j
+    Print #fileNum, Left(rowData, Len(rowData) - 1) ' remove last slash
+    
+    ' Loop through each row
+    For i = 5 To lastRow
+        rowData = ""
+        For j = 2 To lastCol
+            colVal = wsCertif.Cells(i, j).Value
+            If Trim(colVal) = "" Then
+                colVal = "X" ' If column is empty, replace with "X"
+            End If
+            rowData = rowData & " " & colVal & " " '& vbTab
+        Next j
+        ' Remove last tab and write to file
+        Print #fileNum, Left(rowData, Len(rowData) - 1)
+    Next i
+
+    Close #fileNum
+
+    MsgBox "Backup created successfully as " & fileName, vbInformation
+End Sub
+Sub CreerDossier(chemin As String)
+    ' Check if file already exist
+    If Dir(chemin, vbDirectory) = "" Then
+        MkDir chemin
+        MsgBox "The folder did not exist. It was created at : " & chemin
+    End If
+End Sub
+
+Sub BackupSkillMatrix(TeamSelected As String)
+    Dim wsSkillMatrix As Worksheet, wsDVP As Worksheet
+    Dim lastRow As Long, fileNum As Long, i As Long, j As Long
+    Dim fileName As String, backupPath As String, rowData As String
+    Dim rng As Range
+    Dim cell As Range
+    Dim selectedCols As Variant
+    Dim colVal As String
+
+    ' Set your worksheet
+    Set wsSkillMatrix = ActiveSheet
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+
+    ' Find last row with data in column B
+    lastRow = GetLastNonEmptyRow(wsSkillMatrix, 2)
+
+    ' Columns to export: B to F (2 to 6) and J to M (10 to 13)
+    selectedCols = Array(2, 3, 4, 5, 6, 10, 11, 12, 13)
+
+    ' Build the file path
+    backupPath = wsDVP.Cells(11, 4).Value & "Backups Skill Matrix\"
+    fileName = Format(Now, "yyyy-mm-dd_hh-nn-ss") & " - Team " & TeamSelected & " - Skill Matrix.txt"
+    
+    ' Create the text file
+    fileNum = FreeFile
+    Open backupPath & fileName For Output As #fileNum
+    
+    ' Write header with slashes
+    rowData = ""
+    For j = 0 To UBound(selectedCols)
+        rowData = rowData & wsSkillMatrix.Cells(2, selectedCols(j)).Value & "/"
+    Next j
+    Print #fileNum, Left(rowData, Len(rowData) - 1) ' remove last slash
+    
+    ' Loop through each row
+    For i = 3 To lastRow
+        If InStr(1, wsSkillMatrix.Cells(i, 3).Value, TeamSelected) <> 0 Then
+            rowData = ""
+            For j = 0 To UBound(selectedCols)
+                colVal = wsSkillMatrix.Cells(i, selectedCols(j)).Value
+                ' If column J to M and empty, replace with "X"
+                If selectedCols(j) >= 10 And selectedCols(j) <= 13 Then
+                    If Trim(colVal) = "" Then colVal = "X"
+                End If
+                rowData = rowData & colVal & vbTab
+            Next j
+            ' Remove last tab and write to file
+            Print #fileNum, Left(rowData, Len(rowData) - 1)
+        End If
+    Next i
+    For i = 20 To 28 Step 4
+        If InStr(1, wsSkillMatrix.Cells(i, 3).Value, TeamSelected) <> 0 Then
+            rowData = ""
+            For j = 16 To 19
+                colVal = wsSkillMatrix.Cells(i + 2, j).Value
+                rowData = rowData & colVal & vbTab
+            Next j
+            ' Remove last tab and write to file
+            Print #fileNum, Left(rowData, Len(rowData) - 1)
+        End If
+    Next i
+    
+    rowData = ""
+    For j = 16 To 18
+        rowData = rowData & wsSkillMatrix.Cells(7, j).Value & "/"
+    Next j
+    Print #fileNum, Left(rowData, Len(rowData) - 1) ' remove last slash
+    
+    rowData = ""
+    For i = 8 To 10
+        If InStr(1, wsSkillMatrix.Cells(i, 19).Value, TeamSelected) <> 0 Then
+            For j = 16 To 18
+                colVal = wsSkillMatrix.Cells(i, j).Value
+                If Trim(colVal) = "" Then colVal = " X "
+                rowData = rowData & colVal
+            Next j
+            Exit For
+        End If
+    Next i
+    Print #fileNum, rowData
+
+    Close #fileNum
+
+    MsgBox "Backup created successfully as " & fileName, vbInformation
+End Sub
+
+Function ContainsAny(rCheck As Range, rList As Range) As Boolean
+    Dim cell As Range
+    For Each cell In rList
+        If InStr(1, rCheck.Value, cell.Value, vbTextCompare) > 0 Then
+            ContainsAny = True
+            Exit Function
+        End If
+    Next cell
+    ContainsAny = False
+End Function
+
+Sub UpdateProdInSkillMatrix()
+    Dim wsSkillMatrix As Worksheet, wsProjects As Worksheet
+    Dim lastRowProj As Long, lastRow As Long, k As Long, i As Long, NbProdOld As Long, NbProdProj As Long, ColumnDATA As Long
+    Dim DivSurname As String
+    Set wsSkillMatrix = ActiveSheet
+    DivSurname = GetLastElement(wsSkillMatrix.Name, " ")
+    Set wsProjects = ThisWorkbook.Sheets("Projects")
+    ' Set your worksheet
+
+    lastRow = GetLastNonEmptyRow(wsSkillMatrix, 2) + 2
+    lastRowProj = GetLastNonEmptyRow(wsProjects, 9)
+    NbProdOld = (lastRow - 2) / 3 'Number of production lines in wsSkillMatrix
+    
+    ColumnDATA = GetColumnDiv(wsProjects, DivSurname, 10, 28) 'get column where data is stored in cross per production line for this division
+    NbProdProj = CountCross(wsProjects, 11, lastRowProj, ColumnDATA) 'New number of production lines in wsProjects ' column depends on Division !!!!
+
+    If NbProdProj < NbProdOld Then 'less production line with new situation -> delete data
+        ClearRangeSafe wsSkillMatrix.Range("B" & 3 + NbProdProj * 3 & ":M" & lastRow)
+    ElseIf NbProdProj > NbProdOld Then 'more production line with new situation -> extend formulas and data selection
+        wsSkillMatrix.Range("C" & lastRow - 2 & ":C" & lastRow).AutoFill Destination:=wsSkillMatrix.Range("C" & lastRow - 2 & ":C" & 2 + NbProdProj * 3), Type:=xlFillDefault
+        wsSkillMatrix.Range("D" & lastRow - 2 & ":D" & lastRow).AutoFill Destination:=wsSkillMatrix.Range("D" & lastRow - 2 & ":D" & 2 + NbProdProj * 3), Type:=xlFillDefault
+        wsSkillMatrix.Range("E" & lastRow - 2 & ":E" & lastRow).AutoFill Destination:=wsSkillMatrix.Range("E" & lastRow - 2 & ":E" & 2 + NbProdProj * 3), Type:=xlFillDefault
+    End If
+    
+    k = 11
+    For i = 3 To 3 + NbProdProj * 3 Step 3
+        Call FindAndCopyValue(wsSkillMatrix, wsProjects, ColumnDATA, i, k)
+        k = k + 1
+    Next i
+End Sub
+Sub FindAndCopyValue(wsSkillMatrix As Worksheet, ws As Worksheet, ColumnDATA As Long, i As Long, k As Long)
+    With ws
+        If InStr(1, .Cells(k, ColumnDATA).Value, "X") <> 0 Then
+            wsSkillMatrix.Cells(i, 2).Value = .Cells(k, 9).Value
+        ElseIf .Cells(k, 9).Value <> "" Then
+            k = k + 1
+            Call FindAndCopyValue(wsSkillMatrix, ws, ColumnDATA, i, k)
+        End If
+    End With
+End Sub
+Function CountCross(ws As Worksheet, firstrow As Long, lastRow As Long, chosenColumn As Long) As Long
+    Dim k As Long, Nb As Long 'count cross in column chosen
+    Nb = 0
+    For k = firstrow To lastRow
+        If ws.Cells(k, chosenColumn).Value = "X" Then
+            Nb = Nb + 1
+        End If
+    Next k
+    CountCross = Nb
+End Function
+Sub ClearRangeSafe(rng As Range)
+    Dim c As Range
+    For Each c In rng.Cells
+        If c.MergeCells Then
+            ' Only clear if this cell is the top-left cell of the merged area
+            If c.Address = c.MergeArea.Cells(1, 1).Address Then
+                c.MergeArea.ClearContents
+            End If
+        Else
+            c.ClearContents
+        End If
+    Next c
+End Sub
+
+
+

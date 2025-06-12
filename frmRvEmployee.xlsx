@@ -1,0 +1,127 @@
+Private photoPath As String
+Option Explicit
+
+
+Private Sub UserForm_Initialize()
+Rem: Prepare the userform
+    Dim SELECTEDName As String, SelectedShift As String, selectedLine As String, selectedCell As String, SelectedProductionLine As String, SelectedPROJECT As String
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet
+    Dim lastRow As Long, columntoselect As Long, lastColumn As Long, selectedLEVEL As Long, selectedColor As Long, i As Long
+    On Error GoTo InitError
+    Dim n As Name
+    For Each n In ThisWorkbook.Names
+        Debug.Print n.Name, n.RefersTo
+    Next n
+    frmRemoveEmployee.Width = 600
+    frmRemoveEmployee.Height = 500
+    ' Various declarations
+    Set wsDVP = ThisWorkbook.Sheets("Developer")
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    ' Worksheets declarations
+    
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+        For i = 5 To lastRow
+            If CleanString(.Cells(i, 13).Value) <> "UPP" Then
+                cmbEmployees.AddItem .Cells(i, 2).Value
+            End If
+        Next i
+    End With
+
+    Exit Sub
+InitError:
+    MsgBox "Error during initialization: " & Err.Description
+End Sub
+
+Private Sub cmbEmployees_Change()
+Rem: Actions to update the userform if there is a change in it
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim SELECTEDName As String, fileName As String, Linkphoto As String
+    ' Various declarations
+    SELECTEDName = cmbEmployees.Value
+    
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    With wsEmployeeData
+        lastRow = GetLastNonEmptyRow(wsEmployeeData, 2)
+        If lastRow < 5 Then lastRow = 5
+    End With
+
+    For i = 5 To lastRow
+        If CleanString(wsEmployeeData.Cells(i, 2).Value) = CleanString(SELECTEDName) Then
+            Linkphoto = wsEmployeeData.Cells(i, 7).Value & "Employees pictures\" ' Set photo
+            If Dir(Linkphoto) <> "" And CleanString(wsEmployeeData.Cells(i, 13).Value) <> "UPP" Then
+                imgPhoto.Picture = LoadPicture(Linkphoto)
+            Else
+                imgPhoto.Picture = LoadPicture("") ' clears image
+            End If
+            If CleanString(wsEmployeeData.Cells(i, 13).Value) <> "UPP" Then
+                ' Set info labels/textboxes
+                lblName.Caption = wsEmployeeData.Cells(i, 2).Value & " - " & wsEmployeeData.Cells(i, 4).Value
+                lblPosition.Caption = wsEmployeeData.Cells(i, 4).Value
+                lblStartDate.Caption = wsEmployeeData.Cells(i, 5).Value
+                lblDOJO.Caption = wsEmployeeData.Cells(i, 8).Value
+                lblGlasses.Caption = wsEmployeeData.Cells(i, 9).Value
+                Exit For
+            Else
+                lblName.Caption = ""
+                lblPosition.Caption = ""
+                lblStartDate.Caption = ""
+                lblDOJO.Caption = ""
+                lblGlasses.Caption = ""
+            End If
+        End If
+    Next i
+End Sub
+
+Private Sub cmdExit_Click()
+    Unload Me
+End Sub
+Private Sub CommandButtonnemoc_Click()
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim SELECTEDName As String, fileName As String, Linkphoto As String, DivSurname As String, Division As String, response As String
+    ' Various declarations
+    SELECTEDName = cmbEmployees.Value
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    response = MsgBox("Are you sure this employee will be in long term illness?", vbYesNo + vbQuestion, "Long term illness?")
+    If response = vbYes Then
+        With wsEmployeeData
+            lastRow = GetLastNonEmptyRow(wsEmployeeData, 2) '.Range("B4:B" & .Rows.Count).Find("*", , , , xlByRows, xlPrevious).Row
+            If lastRow < 5 Then lastRow = 5
+            For i = 5 To lastRow
+                If InStr(1, CleanString(lblName.Caption), CleanString(.Cells(i, 2).Value)) <> 0 And CleanString(.Cells(i, 4).Value) = CleanString(lblPosition.Caption) And CleanString(.Cells(i, 5).Value) = CleanString(lblStartDate.Caption) Then
+                    .Cells(i, 13).Value = "Dlouhodobá nemoc"
+                    Exit For
+                End If
+            Next i
+        End With
+        Unload Me
+    End If
+End Sub
+Private Sub cmdValidate_Click()
+    Dim ws As Worksheet, wsDVP As Worksheet, wsEmployeeData As Worksheet, wsCertif As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim SELECTEDName As String, fileName As String, Linkphoto As String, DivSurname As String, Division As String, response As String
+    ' Various declarations
+    SELECTEDName = cmbEmployees.Value
+    Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+    response = MsgBox("Are you sure this employee will be UPP?", vbYesNo + vbQuestion, "UPP?")
+    If response = vbYes Then
+        With wsEmployeeData
+            lastRow = GetLastNonEmptyRow(wsEmployeeData, 2) '.Range("B4:B" & .Rows.Count).Find("*", , , , xlByRows, xlPrevious).Row
+            If lastRow < 5 Then lastRow = 5
+            For i = 5 To lastRow
+                If InStr(1, CleanString(lblName.Caption), CleanString(.Cells(i, 2).Value)) <> 0 And CleanString(.Cells(i, 4).Value) = CleanString(lblPosition.Caption) And CleanString(.Cells(i, 5).Value) = CleanString(lblStartDate.Caption) Then
+                    .Cells(i, 13).Value = "UPP"
+                    Exit For
+                End If
+            Next i
+        End With
+        Unload Me
+    End If
+End Sub
+
+
+

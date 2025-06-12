@@ -1,0 +1,82 @@
+Option Explicit
+Public UserResponse As VbMsgBoxResult
+
+Public Sub ShowMessage(lineInfo As String, shiftInfo As String, lineLevel As Long, titleInfo As String, currentName As String)
+    Dim colorCode As Long, selectedCellRaw As Long, SelectedCellColumn As Long
+    On Error Resume Next
+    selectedCellRaw = Evaluate("SelectedCellRaw")
+    SelectedCellColumn = Evaluate("SelectedCellColumn")
+    On Error GoTo 0
+    frmShiftConfirm.Width = 600
+    frmShiftConfirm.Height = 600
+    Select Case UCase(shiftInfo)
+        Case "B": colorCode = vbBlue
+        Case "Y": colorCode = RGB(200, 160, 0)  ' Darker yellow
+        Case "G": colorCode = RGB(0, 128, 0)    ' Dark green
+        Case Else: colorCode = vbBlack
+    End Select
+    ThisWorkbook.Names.Add Name:="colorCode", RefersTo:="=""" & colorCode & """"
+    ' Default message
+    If (selectedCellRaw <> 11 And SelectedCellColumn < 15) Then
+        lblMessage.Caption = "You clicked on the following slot:" & vbCrLf & vbCrLf & _
+                             "Production line: " & lineInfo & vbCrLf & _
+                             "Shift: " & shiftInfo & vbCrLf & _
+                             "Level: " & lineLevel & vbCrLf & _
+                             "Role: " & titleInfo & vbCrLf & _
+                             "Current Operator: " & currentName & vbCrLf & vbCrLf & _
+                             " -> Do you want to edit this slot?"
+    Else
+        lblMessage.Caption = "You clicked on the following slot:" & vbCrLf & vbCrLf & _
+                             "Role: " & titleInfo & vbCrLf & _
+                             "Current Operator: " & currentName & vbCrLf & vbCrLf & _
+                             " -> Do you want to edit this slot?"
+    End If
+    
+    lblMessage.ForeColor = colorCode
+    Me.Show
+End Sub
+
+Private Sub cmdYes_Click()
+    UserResponse = vbYes
+    Me.Hide
+    'frmEmployee.Show
+End Sub
+
+Private Sub cmdNo_Click()
+    UserResponse = vbNo
+    Unload Me
+End Sub
+
+Private Sub CommandButtonMissing_Click()
+    Dim selectedCell As String
+    On Error Resume Next
+    selectedCell = Evaluate("SelectedCell")
+    On Error GoTo 0
+    If VarType(selectedCell) = vbString Then
+        On Error Resume Next
+        Range(selectedCell).Value = "Missing OP/BT/LL/GL"
+        On Error GoTo 0
+    Else
+        MsgBox "'SelectedCell' can't be found.", vbExclamation
+    End If
+    Unload Me
+End Sub
+
+Private Sub CommandButtonnemoc_Click()
+    Dim selectedCell As String
+    On Error Resume Next
+    selectedCell = Evaluate("SelectedCell")
+    On Error GoTo 0
+    If VarType(selectedCell) = vbString Then
+        On Error Resume Next
+        Range(selectedCell).Value = "No Production Plan"
+        On Error GoTo 0
+    Else
+        MsgBox "'SelectedCell' can't be found.", vbExclamation
+    End If
+    Unload Me
+End Sub
+
+Private Sub UserForm_Click()
+
+End Sub

@@ -1,0 +1,34 @@
+Option Explicit
+
+Private Sub Worksheet_Calculate()
+    Rem : if worksheet changes, launching analysis: change of picture
+    Dim wsDVP As Worksheet, wsPageAccueil As Worksheet, wsSkillMatrix As Worksheet, wsEmployeeData As Worksheet, wsActuel As Worksheet, Feuilles() As Worksheet, wsFind As Worksheet
+    Dim plage As Range, plageSource As Range, plageDestination As Range
+    Dim resultString As String
+    Dim lastRow As Long
+    Dim posX As Double, posY As Double, imgWidth As Double, imgHeight As Double
+    Static lastValue As String, imageURL As String
+    ' Various declarations
+   ' Call DésactiverEvents
+     Set wsPageAccueil = ThisWorkbook.Sheets("Menu")
+     Set wsEmployeeData = ThisWorkbook.Sheets("Employees DATA")
+     Set wsFind = ThisWorkbook.Sheets("Find an Employee")
+     Set wsDVP = ThisWorkbook.Sheets("Developer")
+     ' Define the worsheets
+
+    ' === 1. Picture manage ===
+    Rem: If link available, call program changing picture for visual
+    imageURL = Trim(wsFind.Range("Y3").Value) ' Get picture link
+    Set plage = wsFind.Range("Y1:Z5")
+    posX = 1000: posY = 33: imgWidth = 100: imgHeight = 147
+    If imageURL <> "" And CleanString(imageURL) <> CleanString(lastValue) Then ' Check if value changed -> launch program
+        lastValue = imageURL
+        Call AfficherImage(wsFind, plage, imageURL, posX, posY, imgWidth, imgHeight)
+    ElseIf imageURL = "" Then
+        Call CacherImage(wsFind, plage, imageURL, posX, posY, imgWidth, imgHeight)
+    End If
+
+    Call ActiverEvents
+    Exit Sub
+End Sub
+

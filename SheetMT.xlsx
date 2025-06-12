@@ -1,0 +1,138 @@
+Option Explicit
+
+Private Sub OptionButton1_Click()
+
+End Sub
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    Dim lineInfo As String, shiftInfo As String, currentName As String, titleInfo As String, confirmMsg As String, project As String
+    Dim rowNum As Long, colNum As Long, lineLevel As Long, lastRow As Long, Offset As Long
+    Dim tableRange As Range, clickedCell As Range
+    Dim response As VbMsgBoxResult
+    ' Various declarations
+
+    If Target.Cells.Count > 3 Then Exit Sub
+    ' Column F (6) click: ask for CMM validation if not already "OK"
+    If Target.Column = 6 And Target.Row >= 3 Then
+        Dim firstCell As Range
+        Set firstCell = Target.Cells(1, 1)
+        ' Check if merged, then get the top-left cell value safely
+        Dim val As String
+        val = CleanString(firstCell.MergeArea.Cells(1, 1).Value)
+        
+        If CleanString(val) <> "OK" Then
+            ' Save the selected cell as a named range
+            ThisWorkbook.Names.Add Name:="SelectedCMMTarget", RefersTo:=Target.Address(, , , True)
+            ' Capture related info from the same row
+            lineInfo = Me.Cells(Target.Row, 2).Value  ' Column B
+            project = Me.Cells(Target.Row, 5).Value    ' Column E
+
+            ' Save project and line name for use in the form
+            ThisWorkbook.Names.Add Name:="SelectedLine", RefersTo:="=""" & lineInfo & """"
+            ThisWorkbook.Names.Add Name:="SelectedPROJECT", RefersTo:="=""" & project & """"
+            'ThisWorkbook.Names.Add Name:="SelectedCell", RefersTo:=clickedCell.Address(, , , True)
+            ' Launch the validation form
+            frmCMMvalid.Show
+        End If
+    End If
+    
+    If Target.Cells.Count > 1 Then Exit Sub
+    ' Get row and column numbers of the clicked cell
+    rowNum = Target.Row
+    colNum = Target.Column
+    ' Last row in assignment area (based on column E)
+    lastRow = GetLastNonEmptyRow(Me, 2)
+    If lastRow < 3 Then lastRow = 3
+
+    ' Assignment range: E3:J[lastRow]
+    Set tableRange = Union(Me.Range("J3:M" & lastRow), Me.Range("P8:R10"))
+    If Not Intersect(Target, tableRange) Is Nothing Then
+        Set clickedCell = Target
+        ' Get current employee name from clicked cell
+        currentName = Trim(clickedCell.Value)
+        If currentName = "" Then currentName = " "
+        ' Get Title from row 2 (column header)
+        If (rowNum < 8 And rowNum > 10 And colNum < 15) Then
+            titleInfo = Me.Cells(2, clickedCell.Column).Value
+        Else
+            titleInfo = Me.Cells(10, clickedCell.Column).Value
+        End If
+        ' Get line info from columns B:D in same row
+        On Error Resume Next
+        shiftInfo = Me.Cells(clickedCell.Row, 3).Value
+        On Error GoTo 0
+        Offset = GetInfoShift(shiftInfo)
+        ' Determine offset
+        
+        On Error Resume Next
+        lineInfo = Me.Cells(clickedCell.Row - Offset, 2).Value
+        lineLevel = Me.Cells(clickedCell.Row - Offset, 4).Value
+        project = Me.Cells(clickedCell.Row - Offset, 5).Value
+        On Error GoTo 0
+        
+        If IsError(lineInfo) Or IsError(shiftInfo) Or IsError(lineLevel) Or IsError(project) Then
+            MsgBox "Production line, shift, required level or project is not defined for the cell clicked"
+            Exit Sub
+        ElseIf CleanString(VarType(lineLevel)) = CleanString(vbString) Then
+            If CleanString(Trim(lineLevel)) = CleanString("Not found") Then
+                MsgBox "Required level is not defined for the cell clicked, you may have to add a project to the data base in 'Projects' worksheet. "
+                Exit Sub
+            End If
+        End If
+        ThisWorkbook.Names.Add Name:="SelectedCell", RefersTo:=clickedCell.Address(, , , True)
+        Dim confirmForm As frmShiftConfirm
+        Set confirmForm = New frmShiftConfirm
+        confirmForm.ShowMessage lineInfo, shiftInfo, lineLevel, titleInfo, currentName
+        If confirmForm.UserResponse = vbYes Then
+            ' Store all info for UserForm
+            If lineInfo <> "" And shiftInfo <> "" And project <> "" And lineLevel <> 0 Then
+                ThisWorkbook.Names.Add Name:="SelectedOperatorName", RefersTo:="=""" & currentName & """"
+                ThisWorkbook.Names.Add Name:="SelectedLine", RefersTo:="=""" & lineInfo & """"
+                ThisWorkbook.Names.Add Name:="SelectedLEVEL", RefersTo:="=""" & lineLevel & """"
+                ThisWorkbook.Names.Add Name:="SelectedSHIFT", RefersTo:="=""" & shiftInfo & """"
+                ThisWorkbook.Names.Add Name:="SelectedPROJECT", RefersTo:="=""" & project & """"
+                ThisWorkbook.Names.Add Name:="SelectedCell", RefersTo:=clickedCell.Address(, , , True)
+                ThisWorkbook.Names.Add Name:="SelectedCellRaw", RefersTo:="=" & rowNum
+                ThisWorkbook.Names.Add Name:="SelectedCellColumn", RefersTo:="=" & colNum
+                ThisWorkbook.Names.Add Name:="SelectedOffset", RefersTo:="=" & Offset
+                
+                Dim DivSurname As String, i As Long, wsDVP As Worksheet
+                DivSurname = GetLastElement(ActiveSheet.Name, " ")
+                Set wsDVP = ThisWorkbook.Sheets("Developer")
+                For i = 11 To 25
+                    If InStr(1, CleanString(wsDVP.Cells(i, 8).Value), CleanString(DivSurname)) <> 0 Then
+                        ThisWorkbook.Names.Add Name:="SelectedDivision", RefersTo:="=""" & wsDVP.Cells(i, 8).Value & """" 'name of the division to find the worksheets accordingly
+                        Exit For
+                    End If
+                Next i
+                frmEmployee.Show
+            Else
+                MsgBox "The line, shift or project is not defined"
+            End If
+        End If
+    End If
+End Sub
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim cell As Range
+    Dim RowTOfill As Long
+    ' Check if any of the changed cells are in column B
+    If Not Intersect(Target, Me.Columns("E")) Is Nothing Then
+        Application.EnableEvents = False
+        For Each cell In Intersect(Target, Me.Columns("E"))
+            ' Ensure we don't act on header or invalid rows
+            If cell.Row >= 3 Then
+                RowTOfill = RegroupePar3(cell.Row)
+                Me.Cells(RowTOfill, "F").Value = "WAITING"
+            End If
+        Next cell
+        Application.EnableEvents = True
+    End If
+End Sub
+
+Function RegroupePar3(valeur As Integer) As Integer
+    ' Retourne la plus grande valeur multiple de 3 inférieure ou égale a "valeur"
+    RegroupePar3 = (valeur \ 3) * 3
+End Function
+
+
